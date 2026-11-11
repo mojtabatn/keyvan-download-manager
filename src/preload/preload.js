@@ -31,6 +31,7 @@ const INVOKE = new Set([
   'power:state',
   'shell:openPath',
   'shell:openProject',
+  'shell:openSocial',
   'media:status',
   'media:install',
   'media:update',

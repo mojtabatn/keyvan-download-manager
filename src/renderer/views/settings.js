@@ -54,6 +54,30 @@ window.SettingsView = (function () {
     );
   }
 
+  /** Made by … with links to the developer's Telegram and Instagram. */
+  function creator() {
+    const svg = (markup) => {
+      const t = document.createElement('template');
+      t.innerHTML = markup.trim();
+      return t.content.firstChild;
+    };
+    const link = (id, title, icon) => {
+      const b = el('button', { class: `social ${id}`, title, onclick: () => api.invoke('shell:openSocial', id) });
+      b.append(svg(icon));
+      return b;
+    };
+    const telegram =
+      '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="12" fill="#229ED9"/><path fill="#fff" d="M5.4 11.8l11.6-4.5c.54-.2 1 .13.83.95l-1.98 9.3c-.14.66-.54.82-1.1.51l-3-2.22-1.45 1.4c-.16.16-.3.3-.6.3l.21-3.06 5.56-5.02c.24-.21-.05-.33-.38-.12l-6.87 4.33-2.96-.92c-.64-.2-.66-.64.14-.95z"/></svg>';
+    const instagram =
+      '<svg viewBox="0 0 24 24" aria-hidden="true"><defs><radialGradient id="igGrad" cx="0.3" cy="1.07" r="1.2"><stop offset="0" stop-color="#FFD776"/><stop offset="0.25" stop-color="#F3A554"/><stop offset="0.5" stop-color="#E1306C"/><stop offset="0.8" stop-color="#C13584"/><stop offset="1" stop-color="#833AB4"/></radialGradient></defs><rect width="24" height="24" rx="7" fill="url(#igGrad)"/><rect x="5.5" y="5.5" width="13" height="13" rx="4" fill="none" stroke="#fff" stroke-width="1.7"/><circle cx="12" cy="12" r="3.1" fill="none" stroke="#fff" stroke-width="1.7"/><circle cx="16.1" cy="7.9" r="1" fill="#fff"/></svg>';
+    return el(
+      'div',
+      { class: 'set-row creator' },
+      el('div', { class: 'set-text' }, el('div', { class: 'set-hint', text: 'Made by' }), el('div', { class: 'set-label', text: 'Mojtaba Navade' })),
+      el('div', { class: 'socials' }, link('telegram', 'Telegram · t.me/mojtabatn', telegram), link('instagram', 'Instagram · instagram.com/mojtabanavade', instagram))
+    );
+  }
+
   /** "Check now" plus the result of the last check. */
   function updateRow() {
     const hint = el('div', { class: 'set-hint', text: 'Not checked yet.' });
@@ -205,6 +229,7 @@ window.SettingsView = (function () {
           el('img', { src: 'assets/icons/logo.svg', alt: '' }),
           el('div', {}, el('div', { class: 'set-label', text: `Keyvan Download Manager ${String(info.version).replace(/\.0$/, '')}` }), el('div', { class: 'set-hint', text: 'KDM · minimal, multi-connection download manager.' }))
         ),
+        creator(),
         row('Check for updates automatically', 'KDM looks for new versions on GitHub and shows a button when one is ready.', toggle((x) => x.autoUpdate !== false, (v) => save({ autoUpdate: v }))),
         updateRow()
       )

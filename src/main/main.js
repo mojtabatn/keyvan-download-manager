@@ -695,6 +695,12 @@ function registerIpc() {
   h('update:state', () => (updater ? updater.state : null));
   h('update:check', () => (updater ? updater.check() : null));
   h('update:action', (e) => updateAction(senderWindow(e)));
+  // fixed links only: the renderer passes a name, never a URL
+  h('shell:openSocial', (_e, id) => {
+    const url = { telegram: 'https://t.me/mojtabatn', instagram: 'https://www.instagram.com/mojtabanavade' }[id];
+    if (url) shell.openExternal(url);
+    return !!url;
+  });
   h('shell:openProject', () => {
     const url = projectUrl();
     if (!url) return false;
