@@ -3,11 +3,11 @@
 const fs = require('fs');
 const path = require('path');
 
-const THEME_IDS = ['system', 'light', 'dark', 'day', 'night', 'paper', 'mint', 'ocean', 'neon', 'jungle', 'retro'];
+const THEME_IDS = ['light', 'dark', 'day', 'night', 'paper', 'mint', 'ocean', 'neon', 'jungle', 'retro'];
 
 function defaults(downloadsDir) {
   return {
-    theme: 'system', // 'system' or a theme id from windows.js THEMES
+    theme: 'light', // a theme id from windows.js THEMES
     downloadDir: downloadsDir,
     categorize: true, // sort into Video / Music / Compressed / Documents / Programs / General
     connections: 8, // connections per download
@@ -46,6 +46,8 @@ class Settings {
     } catch {
       /* first run */
     }
+    // Older versions stored 'system' (or a theme that no longer exists).
+    if (!THEME_IDS.includes(this.data.theme)) this.data.theme = 'light';
   }
 
   get() {

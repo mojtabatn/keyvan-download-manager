@@ -1,7 +1,7 @@
 'use strict';
 
 const path = require('path');
-const { BrowserWindow, nativeTheme, screen, shell } = require('electron');
+const { BrowserWindow, screen, shell } = require('electron');
 
 const RENDERER = path.join(__dirname, '..', 'renderer');
 const PRELOAD = path.join(__dirname, '..', 'preload', 'preload.js');
@@ -210,15 +210,14 @@ class Windows {
   }
 }
 
-/** Settings value ('system' or a theme id) -> the theme id to render. */
+/** Settings value -> the theme id to render (Light is the default). */
 function resolveTheme(setting) {
-  if (THEMES[setting]) return setting;
-  return nativeTheme.shouldUseDarkColors ? 'dark' : 'light';
+  return THEMES[setting] ? setting : 'light';
 }
 
 /** What Electron's nativeTheme should follow (native menus, dialogs, scrollbars). */
 function nativeThemeSource(setting) {
-  return THEMES[setting] ? THEMES[setting].base : 'system';
+  return THEMES[resolveTheme(setting)].base;
 }
 
 module.exports = { Windows, resolveTheme, nativeThemeSource, THEMES };

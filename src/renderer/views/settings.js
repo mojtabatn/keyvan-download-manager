@@ -31,7 +31,6 @@ window.SettingsView = (function () {
   }
 
   const THEMES = [
-    ['system', 'System'],
     ['light', 'Light'],
     ['dark', 'Dark'],
     ['day', 'Day'],
@@ -57,8 +56,7 @@ window.SettingsView = (function () {
 
   function themePicker() {
     const cards = THEMES.map(([id, name]) => {
-      const preview = id === 'system' ? el('div', { class: 'theme-split', title: 'Follows Windows light / dark mode' }, miniPreview('light'), miniPreview('dark')) : miniPreview(id);
-      const card = el('button', { class: 'theme-card', title: id === 'system' ? 'Follow Windows (light / dark)' : `${name} theme`, onclick: () => save({ theme: id }) }, preview, el('span', { text: name }));
+      const card = el('button', { class: 'theme-card', title: `${name} theme`, onclick: () => save({ theme: id }) }, miniPreview(id), el('span', { text: name }));
       card.dataset.v = id;
       return card;
     });

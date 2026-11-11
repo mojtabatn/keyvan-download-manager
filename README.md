@@ -25,6 +25,7 @@ A minimal, fast download manager for Windows, built from the Figma design
 - Global and per-download speed limits
 - “Online Watch” to stream video or audio before downloading (falls back to VLC / PotPlayer)
 - Tray icon, progress on the taskbar button, notifications, and the system kept awake while downloading
+- 10 themes: Light (default) and Dark from the design, plus Day, Night, Paper, Mint, Ocean, Neon, Jungle and Retro 95
 - Paste several links at once or drag and drop links onto the window; copy a SHA-256 checksum
 
 ## Install
