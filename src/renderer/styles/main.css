@@ -11,7 +11,7 @@
   flex: none;
   border-radius: 5px;
   background: var(--blue-btn);
-  border: 0.5px solid #fff;
+  border: 0.5px solid var(--btn-edge);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25), 0 0 0 1px #158aff, inset 0 10px 15px rgba(255, 255, 255, 0.2);
   color: #fff;
   font-size: 14px;

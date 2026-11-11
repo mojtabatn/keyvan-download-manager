@@ -51,6 +51,7 @@
   --title-line: #e1e1e1;
   --card-shadow: -5px 5px 30px rgba(0, 0, 0, 0.05);
   --menu-shadow: 0 8px 28px rgba(0, 0, 0, 0.14), 0 0 0 1px rgba(0, 0, 0, 0.04);
+  --btn-edge: rgba(255, 255, 255, 0.1); /* white edge on primary buttons (10%) */
   --btn3d: 0 0 0 1px #158aff, 0 0 0 3px rgba(0, 0, 0, 0.05), 0 2px 8px rgba(0, 0, 0, 0.25), inset 0 10px 15px rgba(255, 255, 255, 0.2);
   --scroll: rgba(0, 0, 0, 0.16);
   --font: 'Manrope', 'Segoe UI Variable Text', 'Segoe UI', Tahoma, system-ui, sans-serif;
@@ -162,10 +163,10 @@ input, select, textarea { font: inherit; color: inherit; }
 .btn-primary {
   color: #fff;
   background: var(--blue);
-  border: 1px solid #fff;
+  border: 1px solid var(--btn-edge);
   box-shadow: var(--btn3d);
 }
-:root[data-theme='dark'] .btn-primary { border-color: var(--blue); }
+:root[data-theme='dark'] .btn-primary { border-color: var(--btn-edge); }
 .btn-primary:hover:not(:disabled) { background: #2b8ff6; }
 .btn-secondary { background: var(--btn2-bg); color: var(--btn2-text); }
 .btn-secondary:hover:not(:disabled) { background: var(--hover); filter: brightness(0.98); }
