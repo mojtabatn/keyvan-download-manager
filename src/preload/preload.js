@@ -21,8 +21,6 @@ const INVOKE = new Set([
   'dialog:payload',
   'dialog:pickFolder',
   'disk:free',
-  'connection:set',
-  'connection:test',
   'player:open',
   'player:external',
   'window:close',

@@ -2,10 +2,6 @@
 
 const http = require('http');
 const https = require('https');
-const { HttpsProxyAgent } = require('https-proxy-agent');
-const { HttpProxyAgent } = require('http-proxy-agent');
-const { SocksProxyAgent } = require('socks-proxy-agent');
-
 const DEFAULT_UA =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36';
 
@@ -19,31 +15,10 @@ class HttpError extends Error {
   }
 }
 
-const directAgents = {
+const agents = {
   'http:': new http.Agent({ keepAlive: true, maxSockets: 256 }),
   'https:': new https.Agent({ keepAlive: true, maxSockets: 256 }),
 };
-const proxyAgents = new Map();
-
-/**
- * proxy: null for a direct connection, or { type: 'socks5' | 'http', host, port, username?, password? }.
- * SOCKS uses `socks5h` so DNS is resolved by the proxy (what v2ray/xray expect).
- */
-function agentFor(protocol, proxy) {
-  if (!proxy || !proxy.host || !proxy.port) return directAgents[protocol];
-  const auth = proxy.username ? `${encodeURIComponent(proxy.username)}:${encodeURIComponent(proxy.password || '')}@` : '';
-  const key = `${proxy.type}|${auth}${proxy.host}:${proxy.port}|${protocol}`;
-  let agent = proxyAgents.get(key);
-  if (agent) return agent;
-  if (proxy.type === 'http') {
-    const url = `http://${auth}${proxy.host}:${proxy.port}`;
-    agent = protocol === 'https:' ? new HttpsProxyAgent(url, { keepAlive: true }) : new HttpProxyAgent(url, { keepAlive: true });
-  } else {
-    agent = new SocksProxyAgent(`socks5h://${auth}${proxy.host}:${proxy.port}`, { keepAlive: true });
-  }
-  proxyAgents.set(key, agent);
-  return agent;
-}
 
 /**
  * Performs a request, following redirects. Resolves once response headers
@@ -51,7 +26,7 @@ function agentFor(protocol, proxy) {
  * The caller owns the response stream and must consume or destroy it.
  */
 function request(urlStr, opts = {}) {
-  const { method = 'GET', headers = {}, proxy = null, timeout = 30000, maxRedirects = 10, signal } = opts;
+  const { method = 'GET', headers = {}, timeout = 30000, maxRedirects = 10, signal } = opts;
   return new Promise((resolve, reject) => {
     let redirects = 0;
     let currentMethod = method;
@@ -86,7 +61,7 @@ function request(urlStr, opts = {}) {
           path: u.pathname + u.search,
           method: currentMethod,
           headers: h,
-          agent: agentFor(u.protocol, proxy),
+          agent: agents[u.protocol],
         },
         (res) => {
           const loc = res.headers.location;
@@ -136,13 +111,4 @@ function parseContentRange(v) {
   return { start: Number(m[1]), end: Number(m[2]), total: m[3] === '*' ? -1 : Number(m[3]) };
 }
 
-/** Measures round-trip time of a tiny request through the given proxy (or direct). */
-async function testConnection(proxy, url = 'https://www.gstatic.com/generate_204', timeout = 8000) {
-  const t0 = Date.now();
-  const { req, res } = await request(url, { method: 'GET', proxy, timeout });
-  res.resume();
-  req.destroy();
-  return { ok: res.statusCode < 500, status: res.statusCode, ms: Date.now() - t0 };
-}
-
-module.exports = { request, HttpError, parseContentRange, testConnection, DEFAULT_UA };
+module.exports = { request, HttpError, parseContentRange, DEFAULT_UA };

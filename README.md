@@ -10,9 +10,6 @@ A minimal, fast download manager for Windows, built from the Figma design
 - Scheduler: start / stop the queue at set times on chosen days
 - Run something when the queue finishes: shut down, sleep, hibernate, or exit (60 s countdown you can cancel)
 - “How many downloads at a time” for the queue
-- Connection status: **Normal** or **Secure** connection. Secure sends traffic through your local
-  v2ray / Xray / Clash proxy (SOCKS5 or HTTP; v2rayN defaults to `127.0.0.1:10808`). You can also turn it on or off
-  per download with the shield button in the download window.
 
 **IDM-style extras**
 - Dynamic segmentation: a finished connection takes over half of the largest remaining part
@@ -46,12 +43,12 @@ A minimal, fast download manager for Windows, built from the Figma design
 ```bash
 npm install
 npm start          # run the app
-npm test           # download-engine tests (local HTTP server, SOCKS5 + HTTP proxies)
+npm test           # download-engine tests (against a local HTTP test server)
 npm run dist:win   # build the Windows installer + portable exe into dist/ (Linux needs wine + wine32)
 ```
 
 Layout:
-- `src/main/engine/`: download engine (segments, resume, proxies, queue, scheduler)
+- `src/main/engine/`: download engine (segments, resume, queue, scheduler)
 - `src/main/`: Electron main process (windows, tray, IPC, browser bridge on `127.0.0.1:17842`, power actions)
 - `src/renderer/`: UI (HTML/CSS/JS); icons are exported straight from the Figma file
 - `extension/`: Manifest V3 browser extension

@@ -14,8 +14,6 @@ function defaults(downloadsDir) {
     maxConcurrent: 3, // downloads at a time from the queue
     speedLimit: 0, // KB/s, 0 = unlimited
     maxRetries: 10,
-    connectionMode: 'normal', // 'normal' | 'secure'
-    proxy: { type: 'socks5', host: '127.0.0.1', port: 10808, username: '', password: '' },
     listView: 'cards', // 'cards' (large icons) | 'compact' (list without icons)
     showProgressWindow: true,
     showCompleteWindow: true,
@@ -101,13 +99,7 @@ function sanitizePatch(p) {
   if ('speedLimit' in out) out.speedLimit = clamp(out.speedLimit, 0, 10_000_000, 0);
   if ('maxRetries' in out) out.maxRetries = clamp(out.maxRetries, 0, 100, 10);
   if ('theme' in out && !THEME_IDS.includes(out.theme)) delete out.theme;
-  if ('connectionMode' in out && !['normal', 'secure'].includes(out.connectionMode)) delete out.connectionMode;
   if ('listView' in out && !['cards', 'compact'].includes(out.listView)) delete out.listView;
-  if (out.proxy) {
-    out.proxy = { ...out.proxy };
-    if ('port' in out.proxy) out.proxy.port = clamp(out.proxy.port, 1, 65535, 10808);
-    if ('type' in out.proxy && !['socks5', 'http'].includes(out.proxy.type)) delete out.proxy.type;
-  }
   return out;
 }
 

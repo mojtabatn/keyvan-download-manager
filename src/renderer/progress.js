@@ -1,5 +1,5 @@
 'use strict';
-/* Per-download window: progress, pause/resume, secure toggle, connection details. */
+/* Per-download window: progress, pause/resume, connection details. */
 (function () {
   const { params, el, icon, fmtBytes, fmtSpeed, fmtEta, pct, catIcon } = DM;
   const $ = (id) => document.getElementById(id);
@@ -29,7 +29,6 @@
     if (d && d.status === 'completed') return api.invoke('window:close');
     await api.invoke('downloads:action', { id, action: 'cancel' });
   });
-  $('shield').addEventListener('click', () => d && api.invoke('downloads:action', { id, action: 'secure', value: !d.secure }));
   $('openFile').addEventListener('click', async () => {
     await api.invoke('downloads:action', { id, action: 'open' });
     api.invoke('window:close');
@@ -122,11 +121,6 @@
     const titleText = done ? 'Download complete' : running ? (d.size > 0 ? `${p}% Downloading` : 'Downloading') : d.status === 'error' ? 'Download error' : d.status === 'queued' ? 'Queued' : d.status === 'canceled' ? 'Canceled' : `${p}% Paused`;
     $('title').textContent = titleText;
     document.title = `${d.size > 0 && !done ? p + '% ' : ''}${d.filename}`;
-
-    const sh = $('shield');
-    sh.replaceChildren(d.secure ? icon('shield-on') : DM.themedIcon('shield-off'));
-    sh.title = d.secure ? 'Secure connection: on (click to turn off)' : 'Secure connection: off (click to turn on)';
-    sh.hidden = done;
 
     const bar = $('bar');
     bar.className = `at bar big-bar ${done ? 'completed' : running ? '' : d.status}${running && !(d.size > 0) ? ' indeterminate' : ''}`;

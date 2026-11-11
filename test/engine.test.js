@@ -9,7 +9,7 @@ const { Manager } = require('../src/main/engine/manager');
 const { probe } = require('../src/main/engine/download');
 const { parseContentDisposition, sanitize } = require('../src/main/engine/filename');
 const { looksDownloadable, categoryOf } = require('../src/main/engine/categories');
-const { makeData, sha, startServer, startSocks, startHttpProxy } = require('./helpers');
+const { makeData, sha, startServer } = require('./helpers');
 
 const SIZE = 6 * 1024 * 1024 + 12345;
 const DATA = makeData(SIZE);
@@ -26,7 +26,7 @@ test.after(() => {
   fs.rmSync(tmp, { recursive: true, force: true });
 });
 
-function makeManager(overrides = {}, proxy = null) {
+function makeManager(overrides = {}) {
   const dir = fs.mkdtempSync(path.join(tmp, 'm-'));
   const settings = {
     downloadDir: dir,
@@ -35,10 +35,9 @@ function makeManager(overrides = {}, proxy = null) {
     maxConcurrent: 3,
     maxRetries: 4,
     speedLimit: 0,
-    connectionMode: 'normal',
     ...overrides,
   };
-  const m = new Manager({ file: path.join(dir, 'downloads.json'), getSettings: () => settings, getProxy: () => proxy });
+  const m = new Manager({ file: path.join(dir, 'downloads.json'), getSettings: () => settings });
   m.startTimers();
   return { m, dir, settings };
 }
@@ -106,7 +105,7 @@ test('pause and resume keeps already downloaded bytes', async () => {
   // Simulate an app restart: save, then load into a new manager.
   m.saveNow();
   await m.shutdown();
-  const m2 = new (require('../src/main/engine/manager').Manager)({ file: m.file, getSettings: m.getSettings, getProxy: () => null });
+  const m2 = new (require('../src/main/engine/manager').Manager)({ file: m.file, getSettings: m.getSettings });
   m2.load();
   m2.startTimers();
   const again = m2.get(dl.id);
@@ -195,7 +194,7 @@ test('cancel keeps the download in the list (Canceled) and Resume continues', as
   assert.ok(kept > 0 && fs.existsSync(dl.tempPath), 'partial data kept');
   // survives a restart as "canceled"
   m.saveNow();
-  const m2 = new (require('../src/main/engine/manager').Manager)({ file: m.file, getSettings: m.getSettings, getProxy: () => null });
+  const m2 = new (require('../src/main/engine/manager').Manager)({ file: m.file, getSettings: m.getSettings });
   m2.load();
   assert.strictEqual(m2.get(dl.id).d.status, 'canceled');
   m2.resumeAll();
@@ -217,40 +216,6 @@ test('403 becomes a readable error', async () => {
   await waitFor(dl);
   assert.strictEqual(dl.d.status, 'error');
   assert.match(dl.d.error, /403/);
-  await m.shutdown();
-});
-
-test('secure connection through SOCKS5 (v2ray-style) proxy', async () => {
-  const socks = await startSocks();
-  const { m } = makeManager({ connectionMode: 'secure', connections: 4 }, { type: 'socks5', host: '127.0.0.1', port: socks.port });
-  const dl = m.add({ url: `${srv.base}/file/socks.bin`, mode: 'now' });
-  assert.strictEqual(dl.d.secure, true);
-  await waitFor(dl);
-  assert.strictEqual(dl.d.status, 'completed', dl.d.error);
-  assert.strictEqual(fileSha(dl.d.savePath), DATA_SHA);
-  assert.ok(socks.stats.connections > 0);
-  socks.server.close();
-  await m.shutdown();
-});
-
-test('secure connection through HTTP proxy', async () => {
-  const hp = await startHttpProxy();
-  const { m } = makeManager({ connectionMode: 'secure', connections: 3 }, { type: 'http', host: '127.0.0.1', port: hp.port });
-  const dl = m.add({ url: `${srv.base}/file/httpproxy.bin`, mode: 'now' });
-  await waitFor(dl);
-  assert.strictEqual(dl.d.status, 'completed', dl.d.error);
-  assert.strictEqual(fileSha(dl.d.savePath), DATA_SHA);
-  assert.ok(hp.stats.requests > 0);
-  hp.server.close();
-  await m.shutdown();
-});
-
-test('proxy down gives a helpful message', async () => {
-  const { m } = makeManager({ connectionMode: 'secure', maxRetries: 1 }, { type: 'socks5', host: '127.0.0.1', port: 1 });
-  const dl = m.add({ url: `${srv.base}/file/x.bin`, mode: 'now' });
-  await waitFor(dl);
-  assert.strictEqual(dl.d.status, 'error');
-  assert.match(dl.d.error, /proxy|v2ray|Secure/i);
   await m.shutdown();
 });
 

@@ -29,7 +29,7 @@ const T = (name, p, ms = 15000) =>
   fs.mkdirSync(downloads);
   fs.writeFileSync(
     path.join(userData, 'settings.json'),
-    JSON.stringify({ theme, showProgressWindow: false, notifications: false, clipboardWatch: false, connectionMode: 'secure', connections: 8 })
+    JSON.stringify({ theme, showProgressWindow: false, notifications: false, clipboardWatch: false, connections: 8 })
   );
 
   const app = await electron.launch({
@@ -51,12 +51,11 @@ const T = (name, p, ms = 15000) =>
 
   console.log('seeding');
   // Seed a realistic list (mirrors the Figma mock)
-  await T('connection:set', main.evaluate(() => window.api.invoke('connection:set', 'normal')));
   await add({ url: `${fast.base}/file/Fast.X.2023.720p.WEB-DL.x265.SoftSub.NightMovie.mkv`, mode: 'now' });
   await add({ url: `${fast.base}/file/Fast.X.2023.720p.WEB-DL.x265.Dubbed.Audio.NightMovie.mp3`, mode: 'now' });
   await sleep(1500);
   const a = await add({ url: `${slow.base}/file/Fast.X.2023.720p.WEB-DL.x265.SoftSub.NightMovie.mkv`, mode: 'now', filename: 'Fast.X.2023.720p.WEB-DL.x265.SoftSub.NightMovie.mkv', filenameLocked: true });
-  const b = await add({ url: `${slow.base}/file/Silo.S01E07.720p.10bit.WEB-DL.2CH.x265.HEVC.NightMovie.mkv`, mode: 'now', secure: false });
+  const b = await add({ url: `${slow.base}/file/Silo.S01E07.720p.10bit.WEB-DL.2CH.x265.HEVC.NightMovie.mkv`, mode: 'now' });
   const c = await add({ url: `${slow.base}/file/Fast.X.2023.720p.WEB-DL.x265.subtitle.zip`, mode: 'now' });
   await sleep(3500);
   await T('pause b', main.evaluate((id) => window.api.invoke('downloads:action', { id, action: 'pause' }), b.id));
@@ -68,7 +67,6 @@ const T = (name, p, ms = 15000) =>
   await sleep(400);
   await shot(main, `main-compact-${theme}`);
   await main.click('[data-view-mode="cards"]');
-  await T('connection secure', main.evaluate(() => window.api.invoke('connection:set', 'secure')));
   await sleep(300);
 
   // Scheduled + Settings views
@@ -94,11 +92,6 @@ const T = (name, p, ms = 15000) =>
   await sleep(300);
   await dialogPage.fill('#address', `${slow.base}/file/Silo.S01E07.720p.10bit.WEB-DL.2CH.x265.HEVC.NightMovie.mkv`);
   await shot(dialogPage, `dialog-add-${theme}`);
-  await dialogPage.click('#addOk');
-  // Secure mode is on but no proxy runs here -> expect a helpful error first.
-  await dialogPage.waitForSelector('#addStatus.error', { timeout: 15000 });
-  await shot(dialogPage, `dialog-add-proxy-error-${theme}`);
-  await T('connection normal', main.evaluate(() => window.api.invoke('connection:set', 'normal')));
   await dialogPage.click('#addOk');
   await dialogPage.waitForSelector('#paneInfo:not([hidden])', { timeout: 15000 });
   await sleep(700);

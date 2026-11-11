@@ -71,6 +71,8 @@
 /* ------------------------------------------------ toolbar: search · actions · view */
 .content { position: absolute; left: 188px; right: 8px; top: 8px; bottom: 8px; }
 .toolbar { position: relative; height: 40px; display: flex; gap: 8px; }
+.content.settings-mode .toolbar { display: none; }
+.content.settings-mode .card { top: 0; }
 .tool-box { height: 40px; background: var(--surface); border: 1px solid var(--tool-stroke, transparent); border-radius: 5px; flex: none; }
 
 .search { position: relative; flex: 1; min-width: 0; }
@@ -188,7 +190,6 @@
   text-overflow: ellipsis;
 }
 .row.done .name { top: 7px; right: 96px; }
-.row .shield-mini { display: inline-block; width: 14px; height: 14px; vertical-align: -3px; margin-right: 4px; }
 .row .acts { position: absolute; right: 4px; top: 5px; width: 56px; height: 24px; display: flex; justify-content: flex-end; }
 .row .acts button { width: 24px; height: 24px; border-radius: 4px; }
 .row .acts button:hover { background: rgba(0, 0, 0, 0.06); }
@@ -271,12 +272,6 @@
 .seg button { height: 26px; padding: 0 12px; border-radius: 4px; font-size: 12px; font-weight: 500; color: var(--text-2); }
 .seg button.on { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1); }
 :root[data-base='dark'] .seg button.on { background: rgba(255, 255, 255, 0.12); }
-.proxy-grid { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.proxy-grid .host { width: 130px; }
-.proxy-grid .port { width: 76px; }
-.test-result { font-size: 12px; font-weight: 500; }
-.test-result.ok { color: var(--green-text); }
-.test-result.bad { color: var(--red); }
 .steps { margin: 6px 0 4px; padding-left: 18px; font-size: 12px; color: var(--text-2); line-height: 19px; }
 .steps code { font-family: Consolas, monospace; font-size: 11.5px; background: var(--hover); padding: 1px 5px; border-radius: 3px; user-select: text; }
 .about { display: flex; align-items: center; gap: 12px; }

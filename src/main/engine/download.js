@@ -20,8 +20,8 @@ const segDone = (s) => s.done || (s.end >= 0 && s.pos > s.end);
  * Asks the server about a URL without downloading it: final name, size and
  * whether byte ranges (resume + multiple connections) are supported.
  */
-async function probe(url, { headers = {}, proxy = null, timeout = 20000, signal } = {}) {
-  const { req, res, url: finalUrl } = await request(url, { headers: { ...headers, Range: 'bytes=0-' }, proxy, timeout, signal });
+async function probe(url, { headers = {}, timeout = 20000, signal } = {}) {
+  const { req, res, url: finalUrl } = await request(url, { headers: { ...headers, Range: 'bytes=0-' }, timeout, signal });
   try {
     const sc = res.statusCode;
     if (sc >= 400) throw new HttpError(sc);
@@ -58,7 +58,7 @@ async function probe(url, { headers = {}, proxy = null, timeout = 20000, signal 
   }
 }
 
-function friendlyError(err, { secure, proxy } = {}) {
+function friendlyError(err) {
   if (!err) return 'Unknown error';
   if (err instanceof HttpError) {
     switch (err.status) {
@@ -72,22 +72,19 @@ function friendlyError(err, { secure, proxy } = {}) {
     }
   }
   const code = err.code || (/\b(E[A-Z]{3,})\b/.exec(err.message || '') || [])[1] || '';
-  const at = secure && proxy ? `${proxy.host}:${proxy.port}` : '';
-  const via = at ? ` (proxy ${at})` : '';
   if (code === 'ENOSPC') return 'Not enough disk space';
   if (code === 'EACCES' || code === 'EPERM') return 'No permission to write to the folder';
   if (code === 'ENOTFOUND' || code === 'EAI_AGAIN') return 'Server not found — check the address or your connection';
-  if (code === 'ECONNREFUSED') return secure ? `Proxy ${at} refused the connection — is v2ray running?` : 'Connection refused by server';
-  if (code === 'ECONNRESET') return `Connection was reset${via}`;
-  if (/socks/i.test(err.message || '')) return `Secure connection failed${via}: ${err.message}`;
-  if (code === 'ETIMEDOUT' || /timed out/i.test(err.message || '')) return `Connection timed out${via}`;
+  if (code === 'ECONNREFUSED') return 'Connection refused by server';
+  if (code === 'ECONNRESET') return 'Connection was reset';
+  if (code === 'ETIMEDOUT' || /timed out/i.test(err.message || '')) return 'Connection timed out';
   return err.message || String(err);
 }
 
 class Download extends EventEmitter {
   /**
    * @param data persisted record
-   * @param ctx  { throttle: Throttle, settings(): object, proxyFor(secure): proxy|null }
+   * @param ctx  { throttle: Throttle, settings(): object, takenPaths(id) }
    */
   constructor(data, ctx) {
     super();
@@ -99,7 +96,6 @@ class Download extends EventEmitter {
       downloaded: 0,
       segments: [],
       connections: 8,
-      secure: false,
       queued: false,
       error: null,
       speedLimit: 0,
@@ -149,7 +145,6 @@ class Download extends EventEmitter {
       speed: this.running ? Math.round(this.speed) : 0,
       eta: this.running ? this.eta : -1,
       category: d.category,
-      secure: d.secure,
       resumable: d.resumable,
       error: d.error,
       queued: d.queued,
@@ -220,10 +215,6 @@ class Download extends EventEmitter {
     if (this.d.cookies) h.Cookie = this.d.cookies;
     if (this.d.userAgent) h['User-Agent'] = this.d.userAgent;
     return h;
-  }
-
-  proxy() {
-    return this.ctx.proxyFor(this.d.secure);
   }
 
   start() {
@@ -301,13 +292,13 @@ class Download extends EventEmitter {
 
   fail(err) {
     this.recomputeDownloaded();
-    this.d.error = friendlyError(err, { secure: this.d.secure, proxy: this.proxy() });
+    this.d.error = friendlyError(err);
     this.setStatus('error');
     this.emit('failed', this, err);
   }
 
   async prepare() {
-    const info = await probe(this.d.url, { headers: this.headers(), proxy: this.proxy(), signal: this.abortCtl.signal });
+    const info = await probe(this.d.url, { headers: this.headers(), signal: this.abortCtl.signal });
     if (this.aborted) return;
     const hadProgress = this.flushedBytes() > 0;
     const sizeChanged = this.d.size > 0 && info.size !== this.d.size;
@@ -468,7 +459,7 @@ class Download extends EventEmitter {
           this.d.downloaded = 0;
         }
         pendingOffset = seg.recv;
-        const r = await request(this.d.url, { headers, proxy: this.proxy(), timeout: 30000, signal: this.abortCtl.signal });
+        const r = await request(this.d.url, { headers, timeout: 30000, signal: this.abortCtl.signal });
         req = r.req;
         res = r.res;
         this.reqs.add(req);

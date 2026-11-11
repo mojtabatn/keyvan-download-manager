@@ -21,11 +21,10 @@ const DAY_KEYS = [0, 1, 2, 3, 4, 5, 6];
  *   'activity' ({ active, speed, progress })
  */
 class Manager extends EventEmitter {
-  constructor({ file, getSettings, getProxy }) {
+  constructor({ file, getSettings }) {
     super();
     this.file = file;
     this.getSettings = getSettings;
-    this.getProxy = getProxy;
     this.items = new Map();
     this.queueRunning = false;
     this.queueStartedToday = null;
@@ -34,7 +33,6 @@ class Manager extends EventEmitter {
     this.ctx = {
       throttle: this.throttle,
       settings: getSettings,
-      proxyFor: (secure) => (secure ? getProxy() : null),
       takenPaths: (exceptId) => this.takenPaths(exceptId),
     };
     this.saveTimer = null;
@@ -160,20 +158,18 @@ class Manager extends EventEmitter {
     return s.categorize ? path.join(s.downloadDir, CATEGORIES[categoryOf(filename)].folder) : s.downloadDir;
   }
 
-  async probe(url, { referrer, cookies, userAgent, secure } = {}) {
+  async probe(url, { referrer, cookies, userAgent } = {}) {
     const headers = {};
     if (referrer) headers.Referer = referrer;
     if (cookies) headers.Cookie = cookies;
     if (userAgent) headers['User-Agent'] = userAgent;
-    const s = this.getSettings();
-    const useSecure = secure ?? s.connectionMode === 'secure';
-    const info = await probe(url, { headers, proxy: useSecure ? this.getProxy() : null });
+    const info = await probe(url, { headers });
     return { ...info, dir: this.folderFor(info.filename) };
   }
 
   /**
    * opts: { url, filename?, dir?, size?, resumable?, referrer?, cookies?, userAgent?,
-   *         secure?, mode: 'now' | 'queue' | 'paused', filenameLocked? }
+   *         mode: 'now' | 'queue' | 'paused', filenameLocked? }
    */
   add(opts) {
     const s = this.getSettings();
@@ -197,7 +193,6 @@ class Manager extends EventEmitter {
         resumable: !!opts.resumable,
         status: queued ? 'queued' : 'paused',
         connections: s.connections,
-        secure: opts.secure ?? s.connectionMode === 'secure',
         category: categoryOf(filename),
         createdAt: Date.now(),
         queued,
@@ -278,15 +273,6 @@ class Manager extends EventEmitter {
     await d.stop('pause');
     d.update({ url, error: null });
     if (resume) d.start();
-  }
-
-  async setSecure(id, secure) {
-    const d = this.items.get(id);
-    if (!d) return;
-    const wasRunning = d.running;
-    if (wasRunning) await d.stop('pause');
-    d.update({ secure: !!secure });
-    if (wasRunning) d.start();
   }
 
   update(id, patch) {

@@ -166,9 +166,8 @@
 
   function buildRow(d) {
     const cat = el('img', { class: 'cat', alt: '' });
-    const shield = el('img', { class: 'shield-mini', src: 'assets/icons/shield-on.svg', alt: '', title: 'Secure connection' });
     const nameText = el('span');
-    const name = el('div', { class: 'name' }, shield, nameText);
+    const name = el('div', { class: 'name' }, nameText);
     const toggleImg = el('img', { alt: '' });
     const toggle = el('button', { class: 'toggle', title: 'Pause' }, toggleImg);
     const x = el('button', { class: 'x', title: 'Cancel' }, icon('row-x'));
@@ -203,7 +202,7 @@
       select(id);
       api.invoke('downloads:contextMenu', id);
     });
-    return { row, divider, parts: { cat, shield, nameText, name, toggle, toggleImg, x, bar, fill, speed, eta, size, doneMeta, cSize, cStat }, key: '' };
+    return { row, divider, parts: { cat, nameText, name, toggle, toggleImg, x, bar, fill, speed, eta, size, doneMeta, cSize, cStat }, key: '' };
   }
 
   function fillRow(r, d) {
@@ -213,7 +212,6 @@
     if (r.row.className !== cls) r.row.className = cls;
     const catSrc = catIcon(d.category, 'min');
     if (p.cat.getAttribute('src') !== catSrc) p.cat.src = catSrc;
-    p.shield.hidden = !d.secure || done;
     if (p.nameText.textContent !== d.filename) p.nameText.textContent = d.filename;
     p.name.title = d.filename;
     // compact-list cells
@@ -330,6 +328,8 @@
     $('view-list').hidden = !(v === 'all' || v === 'completed');
     $('view-scheduled').hidden = v !== 'scheduled';
     $('view-settings').hidden = v !== 'settings';
+    // Settings has no use for search / actions / view switch: the card takes the full height.
+    $('content').classList.toggle('settings-mode', v === 'settings');
     renderAll();
   }
 

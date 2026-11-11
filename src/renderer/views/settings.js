@@ -75,38 +75,6 @@ window.SettingsView = (function () {
     return f;
   }
 
-  function proxyEditor() {
-    const type = el('select', { class: 'field' }, el('option', { value: 'socks5', text: 'SOCKS5' }), el('option', { value: 'http', text: 'HTTP' }));
-    const host = el('input', { class: 'field host', placeholder: '127.0.0.1', spellcheck: 'false' });
-    const port = el('input', { class: 'field port', type: 'number', min: '1', max: '65535' });
-    const result = el('span', { class: 'test-result' });
-    const test = el('button', { class: 'btn btn-outline blue text-only', text: 'Test', style: 'height:30px;font-size:13px;padding:4px 12px' });
-    const commit = () => save({ proxy: { type: type.value, host: host.value.trim() || '127.0.0.1', port: Number(port.value) || 10808 } });
-    type.addEventListener('change', () => {
-      // v2rayN defaults: SOCKS 10808, HTTP 10809
-      if (type.value === 'http' && port.value === '10808') port.value = '10809';
-      if (type.value === 'socks5' && port.value === '10809') port.value = '10808';
-      commit();
-    });
-    host.addEventListener('change', commit);
-    port.addEventListener('change', commit);
-    test.addEventListener('click', async () => {
-      result.className = 'test-result';
-      result.textContent = 'Testing…';
-      const r = await api.invoke('connection:test');
-      result.className = `test-result ${r.ok ? 'ok' : 'bad'}`;
-      result.textContent = r.ok ? `Connected · ${r.ms} ms` : r.error || 'Failed';
-    });
-    bind.push({
-      apply: (x) => {
-        type.value = x.proxy.type;
-        if (document.activeElement !== host) host.value = x.proxy.host;
-        if (document.activeElement !== port) port.value = String(x.proxy.port);
-      },
-    });
-    return el('div', {}, el('div', { class: 'proxy-grid' }, type, host, port, test), el('div', { style: 'margin-top:6px;min-height:16px' }, result));
-  }
-
   function mount(container, settings, info) {
     root = container;
     s = settings;
@@ -144,13 +112,6 @@ window.SettingsView = (function () {
         row('Show “download complete” window', null, toggle((x) => x.showCompleteWindow, (v) => save({ showCompleteWindow: v }))),
         row('Watch clipboard for links', 'Copying a file link opens the Add Link window.', toggle((x) => x.clipboardWatch, (v) => save({ clipboardWatch: v }))),
         row('Prevent sleep while downloading', null, toggle((x) => x.preventSleep, (v) => save({ preventSleep: v })))
-      ),
-      group(
-        'Secure connection',
-        'proxy',
-        row('Use secure connection', 'New downloads go through the proxy below. Each download can also be switched in its window.', toggle((x) => x.connectionMode === 'secure', (v) => save({ connectionMode: v ? 'secure' : 'normal' }))),
-        el('div', { class: 'set-hint', style: 'margin:-2px 0 10px;font-size:12px', text: 'When “Secure Connection” is on, downloads go through your local proxy (v2rayN / Xray / Clash). v2rayN defaults: SOCKS5 127.0.0.1:10808 or HTTP 10809.' }),
-        proxyEditor()
       ),
       group(
         'Browser integration',

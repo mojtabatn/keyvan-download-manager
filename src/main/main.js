@@ -25,7 +25,6 @@ const {
 
 const { Settings } = require('./settings');
 const { Manager } = require('./engine/manager');
-const { testConnection } = require('./engine/http');
 const { Windows, resolveTheme, nativeThemeSource } = require('./windows');
 const { startIntegrationServer } = require('./integration/server');
 const { watchClipboard } = require('./integration/clipboard');
@@ -74,10 +73,6 @@ const dialogPayloads = new Map();
 
 const extensionDir = () => (app.isPackaged ? path.join(process.resourcesPath, 'extension') : path.join(__dirname, '..', '..', 'extension'));
 const theme = () => resolveTheme(settings.get().theme);
-const proxy = () => {
-  const p = settings.get().proxy;
-  return { type: p.type, host: p.host, port: Number(p.port), username: p.username, password: p.password };
-};
 
 // ---------------------------------------------------------------- startup
 app.whenReady().then(() => {
@@ -90,7 +85,6 @@ app.whenReady().then(() => {
   manager = new Manager({
     file: path.join(userData, 'downloads.json'),
     getSettings: () => settings.get(),
-    getProxy: proxy,
   });
   manager.load();
   wireManagerEvents();
@@ -319,7 +313,6 @@ function createTray() {
 
 function refreshTrayMenu() {
   if (!tray) return;
-  const s = settings.get();
   const items = [
     { label: 'Open KDM', click: () => showMain() },
     { label: 'Add Link…', click: () => openAddDialog() },
@@ -327,9 +320,6 @@ function refreshTrayMenu() {
     { label: 'Pause all', click: () => manager.pauseAll() },
     { label: 'Resume all', click: () => manager.resumeAll() },
     manager.queueRunning ? { label: 'Stop queue', click: () => manager.stopQueue() } : { label: 'Start queue', click: () => manager.startQueue() },
-    { type: 'separator' },
-    { label: 'Normal connection', type: 'radio', checked: s.connectionMode === 'normal', click: () => settings.set({ connectionMode: 'normal' }) },
-    { label: 'Secure connection', type: 'radio', checked: s.connectionMode === 'secure', click: () => settings.set({ connectionMode: 'secure' }) },
   ];
   if (power && power.pending) items.push({ type: 'separator' }, { label: `Cancel ${power.pending.action}`, click: () => power.cancel() });
   items.push({ type: 'separator' }, { label: 'Quit', click: () => quit() });
@@ -349,7 +339,6 @@ function onSettingsChanged(s, prev) {
   }
   if (s.speedLimit !== prev.speedLimit) manager.setSpeedLimit(s.speedLimit);
   if (s.launchAtStartup !== prev.launchAtStartup) applyLoginItem();
-  if (s.connectionMode !== prev.connectionMode) refreshTrayMenu();
   if (s.maxConcurrent !== prev.maxConcurrent) manager.pump();
   if (s.preventSleep !== prev.preventSleep) updateSleepBlocker(lastActivity.active > 0);
   windows.broadcast('settings:changed', s);
@@ -489,9 +478,6 @@ async function runAction(win, { id, action, value }) {
     case 'refreshUrl':
       await manager.refreshUrl(id, String(value || ''));
       break;
-    case 'secure':
-      await manager.setSecure(id, !!value);
-      break;
     case 'queue':
       manager.setQueued(id, !!value);
       break;
@@ -543,7 +529,6 @@ function contextMenuFor(win, id) {
     tpl.push({ label: 'Show progress window', click: act('progress') });
     tpl.push({ label: s.queued ? 'Remove from queue' : 'Add to queue', click: act('queue', !s.queued) });
     if (s.queued) tpl.push({ label: 'Move up in queue', click: act('moveUp') }, { label: 'Move down in queue', click: act('moveDown') });
-    tpl.push({ label: 'Secure connection', type: 'checkbox', checked: s.secure, click: act('secure', !s.secure) });
     tpl.push({ type: 'separator' });
   }
   tpl.push({ label: 'Copy address', click: act('copyUrl') });
@@ -576,12 +561,11 @@ function registerIpc() {
       return await manager.probe(String(opts.url || '').trim(), opts);
     } catch (err) {
       const { friendlyError } = require('./engine/download');
-      const secure = opts.secure ?? settings.get().connectionMode === 'secure';
-      return { error: friendlyError(err, { secure, proxy: proxy() }) };
+      return { error: friendlyError(err) };
     }
   });
   h('downloads:add', (e, opts) => {
-    const dl = manager.add({ ...opts, secure: opts.secure ?? settings.get().connectionMode === 'secure' });
+    const dl = manager.add(opts);
     if (opts.mode === 'now' && settings.get().showProgressWindow) windows.openProgress(dl.id);
     return dl.snapshot();
   });
@@ -623,23 +607,9 @@ function registerIpc() {
     }
   });
 
-  h('connection:set', (_e, mode) => settings.set({ connectionMode: mode === 'secure' ? 'secure' : 'normal' }).connectionMode);
-  h('connection:test', async () => {
-    try {
-      const r = await testConnection(proxy());
-      return r;
-    } catch (err) {
-      const { friendlyError } = require('./engine/download');
-      return { ok: false, error: friendlyError(err, { secure: true, proxy: proxy() }) };
-    }
-  });
-
   h('player:open', async (_e, q) => {
     const part = 'persist:player';
     const ses = session.fromPartition(part);
-    const secure = q.secure ?? settings.get().connectionMode === 'secure';
-    const p = proxy();
-    await ses.setProxy(secure ? { proxyRules: `${p.type === 'http' ? 'http' : 'socks5'}://${p.host}:${p.port}` } : { mode: 'direct' });
     ses.webRequest.onBeforeSendHeaders({ urls: ['http://*/*', 'https://*/*'] }, (d, cb) => {
       const headers = { ...d.requestHeaders };
       if (q.referrer) headers.Referer = q.referrer;

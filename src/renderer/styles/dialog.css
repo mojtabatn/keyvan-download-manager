@@ -17,9 +17,6 @@
 
 /* ---------- download window (progress) ---------- */
 .dl-name { font-size: 14px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 19px; }
-.shield-btn { width: 24px; height: 24px; border-radius: 5px; }
-.shield-btn img { width: 24px; height: 24px; }
-.shield-btn:hover { background: var(--hover); }
 .big-bar { height: 20px; border-radius: 0; }
 .big-bar .fill { background: linear-gradient(180deg, #20d252 0%, #12be42 100%); box-shadow: 0 0 8px rgba(18, 190, 66, 0.35); }
 .big-bar.paused .fill, .big-bar.queued .fill, .big-bar.canceled .fill { background: var(--paused); box-shadow: none; }

@@ -1,7 +1,6 @@
 'use strict';
 
 const http = require('http');
-const net = require('net');
 const crypto = require('crypto');
 
 function makeData(size, seed = 1) {
@@ -100,64 +99,4 @@ function startServer(data, opts = {}) {
   return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve({ server, stats, base: `http://127.0.0.1:${server.address().port}` })));
 }
 
-/** Minimal SOCKS5 server (no auth, CONNECT, IPv4 + domain). */
-function startSocks() {
-  const stats = { connections: 0, hosts: [] };
-  const server = net.createServer((client) => {
-    stats.connections++;
-    client.once('data', (hello) => {
-      if (hello[0] !== 5) return client.destroy();
-      client.write(Buffer.from([5, 0]));
-      client.once('data', (reqb) => {
-        let host;
-        let off;
-        if (reqb[3] === 1) {
-          host = `${reqb[4]}.${reqb[5]}.${reqb[6]}.${reqb[7]}`;
-          off = 8;
-        } else if (reqb[3] === 3) {
-          const len = reqb[4];
-          host = reqb.subarray(5, 5 + len).toString();
-          off = 5 + len;
-        } else return client.destroy();
-        const port = reqb.readUInt16BE(off);
-        stats.hosts.push(`${host}:${port}`);
-        const upstream = net.connect(port, host, () => {
-          client.write(Buffer.from([5, 0, 0, 1, 0, 0, 0, 0, 0, 0]));
-          upstream.pipe(client);
-          client.pipe(upstream);
-        });
-        upstream.on('error', () => client.destroy());
-        client.on('error', () => upstream.destroy());
-      });
-    });
-  });
-  return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve({ server, stats, port: server.address().port })));
-}
-
-/** Minimal HTTP proxy: absolute-form GET forwarding + CONNECT tunnels. */
-function startHttpProxy() {
-  const stats = { requests: 0 };
-  const server = http.createServer((req, res) => {
-    stats.requests++;
-    const u = new URL(req.url);
-    const up = http.request({ host: u.hostname, port: u.port, path: u.pathname + u.search, method: req.method, headers: req.headers }, (ur) => {
-      res.writeHead(ur.statusCode, ur.headers);
-      ur.pipe(res);
-    });
-    up.on('error', () => res.destroy());
-    req.pipe(up);
-  });
-  server.on('connect', (req, socket) => {
-    stats.requests++;
-    const [host, port] = req.url.split(':');
-    const up = net.connect(Number(port), host, () => {
-      socket.write('HTTP/1.1 200 Connection Established\r\n\r\n');
-      up.pipe(socket);
-      socket.pipe(up);
-    });
-    up.on('error', () => socket.destroy());
-  });
-  return new Promise((resolve) => server.listen(0, '127.0.0.1', () => resolve({ server, stats, port: server.address().port })));
-}
-
-module.exports = { makeData, sha, startServer, startSocks, startHttpProxy };
+module.exports = { makeData, sha, startServer };

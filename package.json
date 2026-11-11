@@ -15,11 +15,6 @@
     "dist:win": "electron-builder --win nsis portable --x64 --publish never",
     "pack:win": "electron-builder --win dir --x64"
   },
-  "dependencies": {
-    "http-proxy-agent": "^7.0.2",
-    "https-proxy-agent": "^7.0.6",
-    "socks-proxy-agent": "^8.0.5"
-  },
   "devDependencies": {
     "@fontsource-variable/manrope": "^5.3.0",
     "electron": "45.2.3",
@@ -30,7 +25,7 @@
   "build": {
     "appId": "com.mojtaba.kdm",
     "productName": "Kronos Download Manager",
-    "copyright": "Copyright \u00a9 2026 Mojtaba",
+    "copyright": "Copyright © 2026 Mojtaba",
     "directories": {
       "output": "dist",
       "buildResources": "build"
