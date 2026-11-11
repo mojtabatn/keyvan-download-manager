@@ -77,7 +77,7 @@
 
 /* ------------------------------------------------ toolbar: search · actions · view */
 .content { position: absolute; left: 188px; right: 8px; top: 8px; bottom: 8px; }
-.toolbar { position: relative; height: 40px; display: flex; gap: 8px; }
+.toolbar { position: relative; z-index: 20; height: 40px; display: flex; gap: 8px; }
 .content.settings-mode .toolbar { display: none; }
 .content.settings-mode .card { top: 0; }
 .tool-box { height: 40px; background: var(--surface); border: 1px solid var(--tool-stroke, transparent); border-radius: 5px; flex: none; }
@@ -111,15 +111,20 @@
 .tool-btn { position: relative; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 5px; color: var(--text-3); }
 .tool-btn svg { width: 24px; height: 24px; display: block; }
 .tool-btn:not(:disabled):hover { background: var(--hover); }
-.tool-btn:disabled { opacity: 0.55; cursor: default; }
+/* fade the icon, not the button: opacity on the button would also fade its tooltip
+   and push it under the download list */
+.tool-btn:disabled { opacity: 1; cursor: default; }
+.tool-btn:disabled svg { opacity: 0.55; }
 .tool-btn.resume:not(:disabled) { color: var(--act-resume, #1e8efe); }
 .tool-btn.pause:not(:disabled),
 .tool-btn.stop:not(:disabled) { color: var(--act-pause, #a23c8a); }
 .tool-btn.delete:not(:disabled) { color: var(--act-delete, #fe3440); }
-.view-switch .tool-btn { color: var(--text-3); opacity: 0.75; }
+.view-switch .tool-btn { color: var(--text-3); }
+.view-switch .tool-btn svg { opacity: 0.75; }
 :root[data-base='dark'] { --act-resume: var(--link); --act-pause: #dc86cb; --act-delete: #ff6b72; }
 :root[data-theme='paper'], :root[data-theme='mint'] { --act-resume: var(--blue); }
-.view-switch .tool-btn.on { color: var(--text); opacity: 1; }
+.view-switch .tool-btn.on { color: var(--text); }
+.view-switch .tool-btn.on svg { opacity: 1; }
 
 /* tooltip (shown below, so it never slides under the window's caption buttons) */
 [data-tip]:hover::after {
