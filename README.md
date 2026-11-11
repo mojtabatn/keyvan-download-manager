@@ -54,6 +54,8 @@ A minimal, fast download manager for Windows, built from the Figma design
 ## Develop
 
 ```bash
+git clone https://github.com/mojtabatn/keyvan-download-manager.git
+cd keyvan-download-manager
 npm install
 npm start          # run the app
 npm test           # download-engine tests (against a local HTTP test server)
@@ -68,3 +70,7 @@ Layout:
 - `scripts/ui-check.js`, `scripts/ext-check.js`: end-to-end checks that drive the real app (and a real browser)
 
 Font: the whole UI uses **Manrope** (bundled, SIL Open Font License), so it looks the same on every PC.
+
+## License
+
+MIT, see [LICENSE](LICENSE).
