@@ -27,7 +27,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: macos-14
+          - os: macos-latest
             platform: mac
             command: npx electron-builder --mac dmg --x64 --arm64 --publish never
             files: dist/*.dmg
