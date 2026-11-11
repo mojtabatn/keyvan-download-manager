@@ -149,20 +149,22 @@ app.on('before-quit', (e) => {
 });
 
 /**
- * The app used to be called "Download Manager"; its data folder name follows
+ * The app used to be called "Download Manager" (and briefly "Kronos"); its data folder name follows
  * the product name, so bring the settings and download list across once.
  */
 function migrateFromOldName() {
   if (process.env.DM_USER_DATA) return;
   try {
     const newDir = app.getPath('userData');
-    const oldDir = path.join(app.getPath('appData'), 'Download Manager');
-    if (path.resolve(oldDir) === path.resolve(newDir) || !fs.existsSync(oldDir)) return;
-    fs.mkdirSync(newDir, { recursive: true });
-    for (const f of ['settings.json', 'downloads.json']) {
-      const src = path.join(oldDir, f);
-      const dst = path.join(newDir, f);
-      if (fs.existsSync(src) && !fs.existsSync(dst)) fs.copyFileSync(src, dst);
+    for (const oldName of ['Download Manager', 'Kronos Download Manager']) {
+      const oldDir = path.join(app.getPath('appData'), oldName);
+      if (path.resolve(oldDir) === path.resolve(newDir) || !fs.existsSync(oldDir)) continue;
+      fs.mkdirSync(newDir, { recursive: true });
+      for (const f of ['settings.json', 'downloads.json']) {
+        const src = path.join(oldDir, f);
+        const dst = path.join(newDir, f);
+        if (fs.existsSync(src) && !fs.existsSync(dst)) fs.copyFileSync(src, dst);
+      }
     }
   } catch (e) {
     logError('migrate', e);
@@ -193,7 +195,7 @@ function hookMainClose() {
     if (!trayHintShown && Notification.isSupported()) {
       trayHintShown = true;
       new Notification({
-        title: 'Kronos Download Manager is still running',
+        title: 'Keyvan Download Manager is still running',
         body: 'Downloads continue in the background. Right-click the tray icon to quit.',
         icon: path.join(ASSETS, 'app-256.png'),
         silent: true,
@@ -246,7 +248,7 @@ function wireManagerEvents() {
     lastActivity = a;
     updateTaskbar(a);
     updateSleepBlocker(a.active > 0);
-    if (tray) tray.setToolTip(a.active ? `KDM — ${a.active} active · ${fmtSpeed(a.speed)}` : 'Kronos Download Manager');
+    if (tray) tray.setToolTip(a.active ? `KDM — ${a.active} active · ${fmtSpeed(a.speed)}` : 'Keyvan Download Manager');
   });
 }
 
@@ -306,7 +308,7 @@ function trayImage() {
 
 function createTray() {
   tray = new Tray(trayImage());
-  tray.setToolTip('Kronos Download Manager');
+  tray.setToolTip('Keyvan Download Manager');
   tray.on('click', () => showMain());
   refreshTrayMenu();
 }
@@ -382,7 +384,7 @@ async function confirmRemove(win, snap) {
     buttons: ['Remove', 'Keep'],
     defaultId: 1,
     cancelId: 1,
-    title: 'Kronos Download Manager',
+    title: 'Keyvan Download Manager',
     message: `Remove “${snap.filename}” from the list?`,
     detail: done ? 'The downloaded file stays on your disk.' : 'The partially downloaded data will be deleted.',
     noLink: true,
@@ -428,7 +430,7 @@ async function runAction(win, { id, action, value }) {
         defaultId: 1,
         cancelId: 1,
         noLink: true,
-        title: 'Kronos Download Manager',
+        title: 'Keyvan Download Manager',
         message: `Delete “${s.filename}”?`,
         detail: done ? 'It will be removed from the list.' : 'The download stops and is removed from the list; the partially downloaded data is deleted.',
       };

@@ -1,4 +1,4 @@
-# Kronos Download Manager (KDM)
+# Keyvan Download Manager (KDM)
 
 A minimal, fast download manager for Windows, built from the Figma design
 (“Download Manager”, light + dark mode), with the useful parts of IDM added.
@@ -33,7 +33,7 @@ A minimal, fast download manager for Windows, built from the Figma design
 ### Browser extension
 1. Open `edge://extensions` or `chrome://extensions` and turn on **Developer mode**.
 2. Click **Load unpacked** and pick the extension folder (Settings → Browser integration → *Open extension folder*;
-   after installing it's in `…\Kronos Download Manager\resources\extension`).
+   after installing it's in `…\Keyvan Download Manager\resources\extension`).
 
 ## Keyboard
 `Ctrl+N` add link · `Ctrl+F` search · `Ctrl+V` paste link(s) · `Space` pause or resume · `Enter` open · `Delete` cancel or remove

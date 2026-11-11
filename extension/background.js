@@ -1,4 +1,4 @@
-// KDM (Kronos Download Manager) — browser integration (Chrome / Edge / Brave, Manifest V3)
+// KDM (Keyvan Download Manager) — browser integration (Chrome / Edge / Brave, Manifest V3)
 const APP = 'http://127.0.0.1:17842';
 const DEFAULTS = { enabled: true, minSizeKB: 512 };
 const SKIP_MIME = /^(image\/|text\/(html|css|javascript|plain)|application\/(json|javascript|xml|x-javascript|pdf))/i;

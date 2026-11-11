@@ -77,7 +77,7 @@ class Windows {
       maximizable: resizable,
       fullscreenable: kind === 'player',
       show: false,
-      title: title || 'Kronos Download Manager',
+      title: title || 'Keyvan Download Manager',
       icon: ICON,
       parent,
       backgroundColor: c.bg,
@@ -131,7 +131,7 @@ class Windows {
       minHeight: 440,
       resizable: true,
       show,
-      title: 'Kronos Download Manager',
+      title: 'Keyvan Download Manager',
     });
     this.main.on('closed', () => (this.main = null));
     return this.main;

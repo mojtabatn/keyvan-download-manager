@@ -133,7 +133,7 @@ window.SettingsView = (function () {
           'div',
           { class: 'about', style: 'padding:4px 0 8px' },
           el('img', { src: 'assets/icons/logo.svg', alt: '' }),
-          el('div', {}, el('div', { class: 'set-label', text: `Kronos Download Manager ${String(info.version).replace(/\.0$/, '')}` }), el('div', { class: 'set-hint', text: 'KDM · minimal, multi-connection download manager.' }))
+          el('div', {}, el('div', { class: 'set-label', text: `Keyvan Download Manager ${String(info.version).replace(/\.0$/, '')}` }), el('div', { class: 'set-hint', text: 'KDM · minimal, multi-connection download manager.' }))
         )
       )
     );

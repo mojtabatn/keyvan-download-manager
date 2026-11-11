@@ -8,6 +8,7 @@ const { Download, probe } = require('./download');
 const { Throttle } = require('./throttle');
 const { CATEGORIES, categoryOf } = require('./categories');
 const { sanitize, fromUrl, uniquePath } = require('./filename');
+const { MediaDownload, mediaTarget } = require('../media/media');
 
 const TICK_MS = 500;
 const DAY_KEYS = [0, 1, 2, 3, 4, 5, 6];
@@ -21,7 +22,7 @@ const DAY_KEYS = [0, 1, 2, 3, 4, 5, 6];
  *   'activity' ({ active, speed, progress })
  */
 class Manager extends EventEmitter {
-  constructor({ file, getSettings }) {
+  constructor({ file, getSettings, tools = null }) {
     super();
     this.file = file;
     this.getSettings = getSettings;
@@ -35,6 +36,8 @@ class Manager extends EventEmitter {
       settings: getSettings,
       takenPaths: (exceptId) => this.takenPaths(exceptId),
     };
+    // video/stream downloads run through yt-dlp (see media/)
+    this.mediaCtx = { tools, settings: getSettings };
     this.saveTimer = null;
     this.ticker = null;
     this.scheduler = null;
@@ -52,7 +55,7 @@ class Manager extends EventEmitter {
       if (!data || !data.id || !data.url) continue;
       if (['downloading', 'connecting'].includes(data.status)) data.status = data.queued ? 'queued' : 'paused';
       if (data.status === 'removed') continue;
-      const dl = new Download(data, this.ctx);
+      const dl = data.type === 'media' ? new MediaDownload(data, this.mediaCtx) : new Download(data, this.ctx);
       this.hook(dl);
       this.items.set(dl.id, dl);
     }
@@ -172,6 +175,7 @@ class Manager extends EventEmitter {
    *         mode: 'now' | 'queue' | 'paused', filenameLocked? }
    */
   add(opts) {
+    if (opts.type === 'media') return this.addMedia(opts);
     const s = this.getSettings();
     const filename = sanitize(opts.filename || fromUrl(opts.url) || 'download');
     const dir = opts.dir || this.folderFor(filename);
@@ -200,6 +204,54 @@ class Manager extends EventEmitter {
         addedFrom: opts.source || 'manual',
       },
       this.ctx
+    );
+    this.hook(dl);
+    this.items.set(dl.id, dl);
+    this.emit('added', dl.snapshot());
+    this.save();
+    if (opts.mode === 'now') dl.start();
+    else if (queued) this.pump();
+    return dl;
+  }
+
+  /**
+   * opts: { type: 'media', url, title, format, audioOnly, ext, quality, size, dir?,
+   *         referrer?, cookies?, userAgent?, mode }
+   */
+  addMedia(opts) {
+    const s = this.getSettings();
+    const ext = opts.audioOnly ? 'mp3' : opts.ext || 'mp4';
+    const category = opts.audioOnly ? 'audio' : 'video';
+    const dir = opts.dir || (s.categorize ? path.join(s.downloadDir, CATEGORIES[category].folder) : s.downloadDir);
+    const savePath = mediaTarget(dir, opts.title || 'video', ext, this.takenPaths());
+    const queued = opts.mode === 'queue';
+    const maxOrder = Math.max(0, ...[...this.items.values()].map((d) => d.d.queueOrder || 0));
+    const dl = new MediaDownload(
+      {
+        id: crypto.randomUUID(),
+        type: 'media',
+        url: opts.url,
+        referrer: opts.referrer || '',
+        cookies: opts.cookies || '',
+        userAgent: opts.userAgent || '',
+        title: opts.title || '',
+        format: opts.format,
+        audioOnly: !!opts.audioOnly,
+        quality: opts.quality || '',
+        filename: path.basename(savePath),
+        dir,
+        savePath,
+        size: opts.size > 0 ? opts.size : -1,
+        sizeEstimate: opts.size > 0 ? opts.size : 0,
+        status: queued ? 'queued' : 'paused',
+        connections: s.connections,
+        category,
+        createdAt: Date.now(),
+        queued,
+        queueOrder: queued ? maxOrder + 1 : 0,
+        addedFrom: opts.source || 'manual',
+      },
+      this.mediaCtx
     );
     this.hook(dl);
     this.items.set(dl.id, dl);
