@@ -176,7 +176,7 @@ window.SettingsView = (function () {
         'General',
         'general',
         row('Keep running in the tray', 'Closing the window keeps downloads going.', toggle((x) => x.closeToTray, (v) => save({ closeToTray: v }))),
-        row('Launch at Windows startup', 'Starts minimized to the tray.', toggle((x) => x.launchAtStartup, (v) => save({ launchAtStartup: v }))),
+        row(/Macintosh/.test(navigator.userAgent) ? 'Open at login' : 'Launch at Windows startup', /Macintosh/.test(navigator.userAgent) ? 'Starts in the menu bar.' : 'Starts minimized to the tray.', toggle((x) => x.launchAtStartup, (v) => save({ launchAtStartup: v }))),
         row('Notifications', 'Show a notification when a download finishes or fails.', toggle((x) => x.notifications, (v) => save({ notifications: v })))
       ),
       group(

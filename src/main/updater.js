@@ -15,12 +15,13 @@ const { request } = require('./engine/http');
  * build can't replace itself while running, so it just points to the release page.
  */
 class Updater extends EventEmitter {
-  constructor({ version, repo, cacheDir, portable = false, apiBase = 'https://api.github.com', allowedPrefixes }) {
+  constructor({ version, repo, cacheDir, portable = false, assetPattern = null, apiBase = 'https://api.github.com', allowedPrefixes }) {
     super();
     this.version = version;
     this.repo = repo;
     this.cacheDir = cacheDir;
     this.portable = portable;
+    this.assetPattern = assetPattern;
     this.apiBase = apiBase.replace(/\/$/, '');
     // installers are only ever fetched from this project's own release files
     this.allowed = allowedPrefixes || [`https://github.com/${repo}/releases/download/`];
@@ -61,7 +62,7 @@ class Updater extends EventEmitter {
         this.set({ status: 'none', checkedAt: Date.now() });
         return this.state;
       }
-      const want = this.portable ? /^KDM-Portable-.*\.exe$/i : /^KDM-Setup-.*\.exe$/i;
+      const want = this.assetPattern || (this.portable ? /^KDM-Portable-.*\.exe$/i : /^KDM-Setup-.*\.exe$/i);
       const asset = (rel.assets || []).find((a) => want.test(a.name));
       this.set({
         status: 'available',

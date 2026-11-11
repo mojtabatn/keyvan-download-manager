@@ -163,6 +163,8 @@ input, select, textarea { font: inherit; color: inherit; }
   text-overflow: ellipsis;
 }
 .page { position: absolute; inset: 32px 0 0 0; }
+/* macOS: leave room for the traffic lights (close / minimise / zoom) on the left */
+:root[data-platform='mac'] .titlebar { padding-left: 78px; padding-right: 16px; }
 
 /* ------------------------------------------------------------------ buttons (Figma "3D Button Style") */
 .btn {

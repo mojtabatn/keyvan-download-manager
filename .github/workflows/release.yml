@@ -1,0 +1,80 @@
+# Builds KDM and attaches the installers to the GitHub release.
+#  - Publishing a release (tag vX.Y.Z) builds the Mac and Windows versions automatically.
+#  - "Run workflow" on the Actions tab builds the chosen branch (normally main) and attaches the files to an
+#    existing release, e.g. to add the Mac version to v0.1.0.
+name: Build release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to build and attach files to (for example v0.1.0)
+        required: true
+      platforms:
+        description: Which versions to build
+        type: choice
+        options: [mac, windows, both]
+        default: both
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            platform: mac
+            command: npx electron-builder --mac dmg --x64 --arm64 --publish never
+            files: dist/*.dmg
+          - os: windows-latest
+            platform: windows
+            command: npx electron-builder --win nsis portable --x64 --publish never
+            files: dist/*.exe
+    runs-on: ${{ matrix.os }}
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      WANT: ${{ inputs.platforms || 'both' }}
+    steps:
+      - name: Skip platforms that were not asked for
+        id: want
+        shell: bash
+        run: |
+          if [ "$WANT" = "both" ] || [ "$WANT" = "${{ matrix.platform }}" ]; then echo "run=yes" >> "$GITHUB_OUTPUT"; fi
+
+      - uses: actions/checkout@v4
+        if: steps.want.outputs.run == 'yes'
+        with:
+          # a published release builds its own tag; "Run workflow" builds the branch it was started from
+          ref: ${{ github.event.release.tag_name || github.ref }}
+
+      - uses: actions/setup-node@v4
+        if: steps.want.outputs.run == 'yes'
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        if: steps.want.outputs.run == 'yes'
+        run: npm ci
+
+      - name: Test
+        if: steps.want.outputs.run == 'yes' && matrix.platform == 'mac'
+        run: npm test
+
+      - name: Build
+        if: steps.want.outputs.run == 'yes'
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: ${{ matrix.command }}
+
+      - name: Attach to the release
+        if: steps.want.outputs.run == 'yes'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$TAG" ${{ matrix.files }} --clobber --repo "$GITHUB_REPOSITORY"

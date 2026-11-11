@@ -11,6 +11,7 @@ const TITLE_H = 32;
 // of the page. Keep them 1px shorter than the HTML title bar so its bottom
 // border line stays visible underneath them too.
 const OVERLAY_H = TITLE_H - 1;
+const IS_MAC = process.platform === 'darwin';
 
 // Window chrome colours per theme (title bar strip + caption buttons).
 // Native window chrome per theme: title-bar strip behind the caption buttons
@@ -59,7 +60,7 @@ class Windows {
       const c = this.chromeFor(kind);
       try {
         w.setBackgroundColor(c.bg);
-        if (kind !== 'player') w.setTitleBarOverlay({ color: c.color, symbolColor: c.symbolColor, height: OVERLAY_H });
+        if (kind !== 'player' && !IS_MAC) w.setTitleBarOverlay({ color: c.color, symbolColor: c.symbolColor, height: OVERLAY_H });
       } catch {
         /* overlay not supported on this platform */
       }
@@ -82,7 +83,13 @@ class Windows {
       parent,
       backgroundColor: c.bg,
       titleBarStyle: kind === 'player' ? 'default' : 'hidden',
-      titleBarOverlay: kind === 'player' ? undefined : { color: c.color, symbolColor: c.symbolColor, height: OVERLAY_H },
+      // Windows: native min/max/close painted over our title bar. macOS: the traffic lights,
+      // centred in the 32px title bar (the page leaves room for them on the left).
+      ...(kind === 'player'
+        ? {}
+        : IS_MAC
+          ? { trafficLightPosition: { x: 12, y: 9 } }
+          : { titleBarOverlay: { color: c.color, symbolColor: c.symbolColor, height: OVERLAY_H } }),
       autoHideMenuBar: true,
       webPreferences: {
         preload: PRELOAD,

@@ -14,6 +14,8 @@
     document.documentElement.dataset.base = THEME_BASE[id];
   }
   setTheme(params.get('theme'));
+  // macOS: traffic lights on the left of the title bar, ⌘ shortcuts
+  if (/Macintosh/.test(navigator.userAgent)) document.documentElement.dataset.platform = 'mac';
   window.api.on('theme:changed', setTheme);
 
   function fmtBytes(n, digits = 2) {

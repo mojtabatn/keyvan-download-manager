@@ -43,6 +43,12 @@ class PowerActions {
 
   run(action) {
     if (action === 'exit') return this.quitApp();
+    if (process.platform === 'darwin') {
+      const mac = (cmd, args) => execFile(cmd, args, (e) => e && console.error('[power]', e.message));
+      if (action === 'shutdown') mac('osascript', ['-e', 'tell application "System Events" to shut down']);
+      else mac('pmset', ['sleepnow']); // macOS has no separate hibernate
+      return;
+    }
     if (process.platform !== 'win32') {
       console.log(`[power] would ${action} now (only performed on Windows)`);
       return;

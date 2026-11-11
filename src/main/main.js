@@ -59,7 +59,30 @@ if (!app.requestSingleInstanceLock()) {
   process.exit(0);
 }
 app.setAppUserModelId(APP_ID);
-Menu.setApplicationMenu(null);
+const IS_MAC = process.platform === 'darwin';
+// Windows: no menu bar. macOS always shows one, and ⌘C / ⌘V / ⌘Q only work through it.
+Menu.setApplicationMenu(
+  IS_MAC
+    ? Menu.buildFromTemplate([
+        {
+          label: 'KDM',
+          submenu: [
+            { role: 'about', label: 'About Keyvan Download Manager' },
+            { type: 'separator' },
+            { label: 'Add Link…', accelerator: 'CmdOrCtrl+N', click: () => openAddDialog() },
+            { type: 'separator' },
+            { role: 'hide' },
+            { role: 'hideOthers' },
+            { role: 'unhide' },
+            { type: 'separator' },
+            { label: 'Quit KDM', accelerator: 'Cmd+Q', click: () => quit() },
+          ],
+        },
+        { role: 'editMenu' },
+        { role: 'windowMenu' },
+      ])
+    : null
+);
 
 let settings;
 let manager;
@@ -136,6 +159,11 @@ app.whenReady().then(() => {
 
   startUpdater();
   handleArgv(process.argv);
+});
+
+// macOS: clicking the Dock icon brings the window back
+app.on('activate', () => {
+  if (windows) showMain();
 });
 
 app.on('second-instance', (_e, argv) => {
@@ -318,6 +346,14 @@ function openFromBrowser(p) {
 // ---------------------------------------------------------------- tray
 /** Single-colour tray glyph that contrasts with the Windows taskbar (dark by default). */
 function trayImage() {
+  if (IS_MAC) {
+    // menu-bar "template" icon: macOS tints it for light/dark menu bars itself
+    const img = nativeImage.createEmpty();
+    img.addRepresentation({ scaleFactor: 1, buffer: fs.readFileSync(path.join(ASSETS, 'tray-dark-16.png')) });
+    img.addRepresentation({ scaleFactor: 2, buffer: fs.readFileSync(path.join(ASSETS, 'tray-dark-32.png')) });
+    img.setTemplateImage(true);
+    return img;
+  }
   const darkTaskbar = process.platform === 'win32' ? nativeTheme.shouldUseDarkColorsForSystemIntegratedUI !== false : true;
   const v = darkTaskbar ? 'light' : 'dark';
   const img = nativeImage.createEmpty();
@@ -369,6 +405,10 @@ function onSettingsChanged(s, prev) {
 
 // ---------------------------------------------------------------- external players
 function findPlayer() {
+  if (IS_MAC) {
+    const apps = ['/Applications/IINA.app/Contents/MacOS/IINA', '/Applications/VLC.app/Contents/MacOS/VLC', '/Applications/mpv.app/Contents/MacOS/mpv'];
+    return apps.find((p) => fs.existsSync(p)) || null;
+  }
   if (process.platform !== 'win32') return null;
   const pf = [process.env.ProgramFiles, process.env['ProgramFiles(x86)'], process.env.LOCALAPPDATA && path.join(process.env.LOCALAPPDATA, 'Programs')].filter(Boolean);
   const candidates = [];
@@ -721,7 +761,9 @@ function startUpdater() {
       version: app.getVersion(),
       repo: repo.replace(/\.git$/, ''),
       cacheDir: path.join(app.getPath('userData'), 'updates'),
-      portable: !!process.env.PORTABLE_EXECUTABLE_FILE,
+      // the portable exe and the (unsigned) Mac app can't replace themselves: they open the release page
+      portable: !!process.env.PORTABLE_EXECUTABLE_FILE || IS_MAC,
+      assetPattern: IS_MAC ? new RegExp(`^KDM-.*-mac-${process.arch === 'arm64' ? 'arm64' : 'x64'}\\.dmg$`, 'i') : null,
       ...(testApi ? { apiBase: testApi, allowedPrefixes: [testApi] } : {}),
     });
     updater.cleanup();

@@ -4,12 +4,12 @@
 
 # Keyvan Download Manager
 
-**A minimal, fast download manager for Windows, with a built-in video downloader.**
+**A minimal, fast download manager for Windows and macOS, with a built-in video downloader.**
 
 Multi-connection downloads · Video grabber for YouTube, X and 1000+ sites · Queue and scheduler · 10 themes
 
 ![Version](https://img.shields.io/badge/version-0.1.0-1e83f1)
-![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078d4)
+![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS-0078d4)
 ![License](https://img.shields.io/badge/license-MIT-12be42)
 
 <img src="docs/screenshots/main-light.png" width="760" alt="KDM main window" />
@@ -122,10 +122,24 @@ colors the window title bar to match.
 
 ## Install
 
-> Installers will be on the [Releases](https://github.com/mojtabatn/keyvan-download-manager/releases) page.
+Get the latest version from the [Releases](https://github.com/mojtabatn/keyvan-download-manager/releases/latest) page.
+
+### Windows 10 / 11
 
 1. Download `KDM-Setup-0.1.0.exe`, or `KDM-Portable-0.1.0.exe` if you don't want to install anything.
 2. The app isn't code-signed yet, so Windows SmartScreen may warn you. Click **More info → Run anyway**.
+
+### macOS 11 or newer
+
+1. Download the file for your Mac:
+   - Apple Silicon (M1, M2, M3, M4…): `KDM-0.1.0-mac-arm64.dmg`
+   - Intel: `KDM-0.1.0-mac-x64.dmg`
+
+   Not sure which one? Apple menu → **About This Mac** → the *Chip* line says Apple M… or Intel.
+2. Open the `.dmg` and drag **Keyvan Download Manager** into **Applications**.
+3. The app isn't notarized by Apple yet, so the first time macOS refuses to open it. Open
+   **System Settings → Privacy & Security**, scroll down and click **Open Anyway** next to the message about KDM
+   (on macOS 14 and older you can instead right-click the app and choose **Open**).
 
 ### Browser extension
 
@@ -146,6 +160,7 @@ npm install
 npm start          # run the app
 npm test           # engine and video-pipeline tests (local test server, no internet needed)
 npm run dist:win   # build the installer + portable exe into dist/ (on Linux this needs wine)
+npm run dist:mac   # build the macOS .dmg files (on a Mac)
 ```
 
 Project layout:
@@ -163,9 +178,9 @@ The UI uses the **Manrope** font (bundled, SIL Open Font License), so it looks t
 
 ## Publishing a new version
 
-1. Raise `version` in `package.json` (for example `0.2.0`) and run `npm run dist:win`.
-2. On GitHub, create a release with the tag `v0.2.0` and attach `KDM-Setup-0.2.0.exe` and `KDM-Portable-0.2.0.exe`
-   (keep these file names).
+1. Raise `version` in `package.json` (for example `0.2.0`), commit and push.
+2. On GitHub, publish a release with the tag `v0.2.0`. The **Build release** workflow then builds the Windows and
+   Mac versions on GitHub's own machines and attaches them to the release (it takes about 10 minutes).
 3. Installed copies of KDM find it within a few hours, or right away with **Settings → About → Check now**.
 
 ## License

@@ -1,7 +1,14 @@
 'use strict';
+const IS_MAC = document.documentElement.dataset.platform === 'mac';
 /* Main window controller. */
 (function () {
   const { el, icon, fmtBytes, fmtSpeed, fmtEta, fmtSizePair, pct, catIcon, toast, splitUrls } = DM;
+  if (IS_MAC) {
+    // macOS wording: ⌘ shortcuts, and there is no hibernate
+    document.getElementById('addLink').title = 'Add a new download (⌘N)';
+    document.getElementById('emptySub').textContent = 'Click “Add Link”, paste a link (⌘V) or drop one here.';
+    document.querySelector('option[value="hibernate"]')?.remove();
+  }
   const $ = (id) => document.getElementById(id);
 
   const state = {
@@ -157,7 +164,7 @@
           $('emptySub').textContent = 'Finished files will show up here.';
         } else {
           $('emptyTitle').textContent = 'No downloads yet';
-          $('emptySub').textContent = 'Click “Add Link”, paste a link (Ctrl+V) or drop one here.';
+          $('emptySub').textContent = `Click “Add Link”, paste a link (${IS_MAC ? '⌘V' : 'Ctrl+V'}) or drop one here.`;
         }
       }
     }
@@ -500,17 +507,18 @@
   document.addEventListener('keydown', (e) => {
     if (e.target.closest('input, textarea, select')) return;
     const id = state.selected;
-    if (e.ctrlKey && e.key.toLowerCase() === 'n') {
+    const mod = e.ctrlKey || e.metaKey; // ⌘ on macOS
+    if (mod && e.key.toLowerCase() === 'n') {
       e.preventDefault();
       openAdd();
-    } else if (e.ctrlKey && e.key.toLowerCase() === 'f') {
+    } else if (mod && e.key.toLowerCase() === 'f') {
       e.preventDefault();
       focusSearch();
     } else if (!id) {
       return;
     } else if (e.key === 'Escape') {
       select(null);
-    } else if (e.key === 'Delete') {
+    } else if (e.key === 'Delete' || (IS_MAC && e.key === 'Backspace' && e.metaKey)) {
       api.invoke('downloads:action', { id, action: 'delete' });
     } else if (e.key === 'Enter') {
       api.invoke('downloads:action', { id, action: 'open' });
