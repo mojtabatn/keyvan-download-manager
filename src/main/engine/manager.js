@@ -231,6 +231,17 @@ class Manager extends EventEmitter {
     if (d) await d.stop('pause');
   }
 
+  /**
+   * Stops a download but keeps it in the list as "Canceled" (with the bytes
+   * already downloaded, so Resume continues). It also leaves the queue.
+   */
+  async cancel(id) {
+    const d = this.items.get(id);
+    if (!d || d.d.status === 'completed') return;
+    if (d.d.queued) d.update({ queued: false, queueOrder: 0 });
+    await d.stop('cancel');
+  }
+
   async remove(id, { deleteFile = false } = {}) {
     const d = this.items.get(id);
     if (!d) return;

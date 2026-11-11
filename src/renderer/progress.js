@@ -119,7 +119,7 @@
     $('name').textContent = d.filename;
     $('name').title = d.savePath;
 
-    const titleText = done ? 'Download complete' : running ? (d.size > 0 ? `${p}% Downloading` : 'Downloading') : d.status === 'error' ? 'Download error' : d.status === 'queued' ? 'Queued' : `${p}% Paused`;
+    const titleText = done ? 'Download complete' : running ? (d.size > 0 ? `${p}% Downloading` : 'Downloading') : d.status === 'error' ? 'Download error' : d.status === 'queued' ? 'Queued' : d.status === 'canceled' ? 'Canceled' : `${p}% Paused`;
     $('title').textContent = titleText;
     document.title = `${d.size > 0 && !done ? p + '% ' : ''}${d.filename}`;
 
@@ -144,6 +144,7 @@
       speed.textContent = 'Completed';
       speed.classList.add('ok');
     } else if (d.status === 'queued') speed.textContent = 'Waiting in queue';
+    else if (d.status === 'canceled') speed.textContent = 'Canceled';
     else speed.textContent = '';
 
     const eta = $('eta');
@@ -179,7 +180,7 @@
         $('cancel').style.left = `${left + $('openFolder').offsetWidth + 8}px`;
       } else $('cancel').style.left = `${left}px`;
     });
-    $('cancel').querySelector('span').textContent = done ? 'Close' : 'Cancel';
+    $('cancel').querySelector('span').textContent = done ? 'Close' : d.status === 'canceled' ? 'Remove' : 'Cancel';
   }
 
   api.on('downloads:progress', (list) => {

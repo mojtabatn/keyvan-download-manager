@@ -355,15 +355,16 @@ function senderWindow(e) {
   return BrowserWindow.fromWebContents(e.sender);
 }
 
+/** Asks before taking a download off the list. */
 async function confirmRemove(win, snap) {
   const done = snap.status === 'completed';
   const { response } = await dialog.showMessageBox(win, {
     type: 'question',
-    buttons: done ? ['Remove', 'Keep'] : ['Cancel download', 'Keep downloading'],
+    buttons: ['Remove', 'Keep'],
     defaultId: 1,
     cancelId: 1,
     title: 'Download Manager',
-    message: done ? `Remove “${snap.filename}” from the list?` : `Cancel “${snap.filename}”?`,
+    message: `Remove “${snap.filename}” from the list?`,
     detail: done ? 'The downloaded file stays on your disk.' : 'The partially downloaded data will be deleted.',
     noLink: true,
   });
@@ -387,10 +388,17 @@ async function runAction(win, { id, action, value }) {
       else manager.start(id);
       break;
     case 'cancel':
-      if (await confirmRemove(win, s)) await manager.remove(id);
+      // A running / paused / queued download is canceled but stays in the list;
+      // canceling something that is already canceled takes it off the list.
+      if (s.status === 'canceled') {
+        if (await confirmRemove(win, s)) await manager.remove(id);
+      } else {
+        windows.closeProgress(id);
+        await manager.cancel(id);
+      }
       break;
     case 'remove':
-      await manager.remove(id);
+      if (s.status === 'completed' || (await confirmRemove(win, s))) await manager.remove(id);
       break;
     case 'deleteFile': {
       const { response } = await dialog.showMessageBox(win, {
@@ -480,6 +488,7 @@ function contextMenuFor(win, id) {
   if (!done) {
     if (dl.running) tpl.push({ label: 'Pause', click: act('pause') });
     else tpl.push({ label: s.status === 'error' ? 'Retry' : 'Resume', click: act('start') });
+    if (s.status === 'canceled') tpl.push({ label: 'Restart from beginning', click: act('redownload') });
     tpl.push({ label: 'Show progress window', click: act('progress') });
     tpl.push({ label: s.queued ? 'Remove from queue' : 'Add to queue', click: act('queue', !s.queued) });
     if (s.queued) tpl.push({ label: 'Move up in queue', click: act('moveUp') }, { label: 'Move down in queue', click: act('moveDown') });
@@ -491,7 +500,8 @@ function contextMenuFor(win, id) {
   if (done) tpl.push({ label: 'Download again', click: act('redownload') }, { label: 'Copy SHA-256 checksum', click: act('hash') });
   tpl.push({ type: 'separator' });
   if (done) tpl.push({ label: 'Remove from list', click: act('remove') }, { label: 'Delete file…', click: act('deleteFile') });
-  else tpl.push({ label: 'Cancel download…', click: act('cancel') });
+  else if (s.status === 'canceled') tpl.push({ label: 'Remove from list…', click: act('remove') });
+  else tpl.push({ label: 'Cancel download', click: act('cancel') }, { label: 'Remove from list…', click: act('remove') });
   Menu.buildFromTemplate(tpl).popup({ window: win });
 }
 

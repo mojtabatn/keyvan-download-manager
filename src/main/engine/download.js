@@ -248,11 +248,12 @@ class Download extends EventEmitter {
     return this.runPromise;
   }
 
-  /** reason: 'pause' | 'queue' (back to waiting) | 'remove' */
+  /** reason: 'pause' | 'queue' (back to waiting) | 'cancel' (stays in the list as Canceled) | 'remove' */
   async stop(reason = 'pause') {
     if (!this.running) {
       if (reason === 'queue' && this.d.status !== 'completed') this.setStatus('queued');
       else if (reason === 'pause' && ['queued', 'error'].includes(this.d.status)) this.setStatus('paused');
+      else if (reason === 'cancel' && this.d.status !== 'completed') this.setStatus('canceled');
       return;
     }
     this.aborted = true;
@@ -294,7 +295,8 @@ class Download extends EventEmitter {
 
   afterAbort() {
     this.recomputeDownloaded();
-    this.setStatus(this.abortReason === 'queue' ? 'queued' : this.abortReason === 'remove' ? 'removed' : 'paused');
+    const next = { queue: 'queued', remove: 'removed', cancel: 'canceled' };
+    this.setStatus(next[this.abortReason] || 'paused');
   }
 
   fail(err) {

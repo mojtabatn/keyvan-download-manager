@@ -159,6 +159,8 @@
 }
 .view { position: absolute; inset: 0; display: flex; flex-direction: column; }
 .list { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 8px 7px 8px 8px; scrollbar-gutter: stable; }
+/* An empty list takes no space, so the empty-state message is centred in the whole card. */
+.list:empty { display: none; }
 
 .row { position: relative; height: 62px; border-radius: 5px; cursor: default; }
 .row + .divider { height: 1px; background: var(--line); margin: 8px 0; }
@@ -200,6 +202,8 @@
 .row .meta .size { position: absolute; right: 0; white-space: nowrap; }
 .row.error .meta .speed { color: var(--red); max-width: 70%; }
 .row.queued .meta .speed, .row.paused .meta .speed { color: var(--text-3); }
+.row.canceled .meta .speed { color: var(--text-2); }
+.row.canceled .name { color: var(--text-2); }
 .row.done .bar, .row.done .meta { display: none; }
 
 .empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; text-align: center; padding: 24px; }

@@ -56,5 +56,4 @@ Layout:
 - `extension/`: Manifest V3 browser extension
 - `scripts/ui-check.js`, `scripts/ext-check.js`: end-to-end checks that drive the real app (and a real browser)
 
-Font: the UI uses **Satoshi** (as in the design) when it's installed on the system. If it isn't, it uses the bundled
-Plus Jakarta Sans. To get the exact design typography, install Satoshi for free from fontshare.com.
+Font: the whole UI uses **Manrope** (bundled, SIL Open Font License), so it looks the same on every PC.

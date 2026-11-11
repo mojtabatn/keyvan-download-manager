@@ -1,23 +1,22 @@
 /* ------------------------------------------------------------------
    Design tokens — values taken from the Figma file (Light / Dark Mode)
    ------------------------------------------------------------------ */
+/* Manrope (variable, OFL) — bundled so the app looks the same on every PC. */
 @font-face {
-  font-family: 'AppSans';
-  font-weight: 400;
-  src: local('Satoshi Regular'), local('Satoshi-Regular'), local('Satoshi Variable'), local('Satoshi-Variable'),
-    url('../fonts/plus-jakarta-sans-latin-wght-normal.woff2') format('woff2');
+  font-family: 'Manrope';
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: block;
+  src: url('../fonts/manrope-latin-wght-normal.woff2') format('woff2-variations');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 @font-face {
-  font-family: 'AppSans';
-  font-weight: 500;
-  src: local('Satoshi Medium'), local('Satoshi-Medium'), local('Satoshi Variable'), local('Satoshi-Variable'),
-    url('../fonts/plus-jakarta-sans-latin-wght-normal.woff2') format('woff2');
-}
-@font-face {
-  font-family: 'AppSans';
-  font-weight: 700;
-  src: local('Satoshi Bold'), local('Satoshi-Bold'), local('Satoshi Variable'), local('Satoshi-Variable'),
-    url('../fonts/plus-jakarta-sans-latin-wght-normal.woff2') format('woff2');
+  font-family: 'Manrope';
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: block;
+  src: url('../fonts/manrope-latin-ext-wght-normal.woff2') format('woff2-variations');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 
 :root {
@@ -54,8 +53,8 @@
   --menu-shadow: 0 8px 28px rgba(0, 0, 0, 0.14), 0 0 0 1px rgba(0, 0, 0, 0.04);
   --btn3d: 0 0 0 1px #158aff, 0 0 0 3px rgba(0, 0, 0, 0.05), 0 2px 8px rgba(0, 0, 0, 0.25), inset 0 10px 15px rgba(255, 255, 255, 0.2);
   --scroll: rgba(0, 0, 0, 0.16);
-  --font: 'AppSans', 'Satoshi', 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
-  --font-ui: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+  --font: 'Manrope', 'Segoe UI Variable Text', 'Segoe UI', Tahoma, system-ui, sans-serif;
+  --font-ui: var(--font);
 }
 
 :root[data-theme='dark'] {
@@ -245,7 +244,7 @@ select.field option { background: var(--surface); color: var(--text); }
 /* progress bar shared */
 .bar { position: relative; background: var(--track); overflow: hidden; }
 .bar .fill { position: absolute; inset: 0 auto 0 0; width: 0; background: var(--green); transition: width 0.45s linear; }
-.bar.paused .fill, .bar.queued .fill { background: var(--paused); }
+.bar.paused .fill, .bar.queued .fill, .bar.canceled .fill { background: var(--paused); }
 .bar.error .fill { background: var(--red); }
 .bar.indeterminate .fill {
   width: 30% !important; animation: indet 1.2s ease-in-out infinite; transition: none;

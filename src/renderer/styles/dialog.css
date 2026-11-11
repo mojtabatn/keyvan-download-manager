@@ -22,7 +22,7 @@
 .shield-btn:hover { background: var(--hover); }
 .big-bar { height: 20px; border-radius: 0; }
 .big-bar .fill { background: linear-gradient(180deg, #20d252 0%, #12be42 100%); box-shadow: 0 0 8px rgba(18, 190, 66, 0.35); }
-.big-bar.paused .fill, .big-bar.queued .fill { background: var(--paused); box-shadow: none; }
+.big-bar.paused .fill, .big-bar.queued .fill, .big-bar.canceled .fill { background: var(--paused); box-shadow: none; }
 .big-bar.error .fill { background: var(--red); box-shadow: none; }
 .big-bar.completed .fill { background: linear-gradient(180deg, #20d252 0%, #12be42 100%); }
 .dl-meta { font-size: 12px; font-weight: 700; line-height: 16px; color: var(--text-3); white-space: nowrap; }

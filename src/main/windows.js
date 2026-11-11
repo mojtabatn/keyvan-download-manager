@@ -7,6 +7,10 @@ const RENDERER = path.join(__dirname, '..', 'renderer');
 const PRELOAD = path.join(__dirname, '..', 'preload', 'preload.js');
 const ICON = path.join(RENDERER, 'assets', 'app-256.png');
 const TITLE_H = 32;
+// The native caption buttons (min / max / close) are painted by Windows on top
+// of the page. Keep them 1px shorter than the HTML title bar so its bottom
+// border line stays visible underneath them too.
+const OVERLAY_H = TITLE_H - 1;
 
 // Window chrome colours per theme (title bar strip + caption buttons).
 const CHROME = {
@@ -34,7 +38,7 @@ class Windows {
   chromeFor(kind) {
     const t = CHROME[this.getTheme()];
     const role = kind === 'main' ? 'main' : 'dialog';
-    return { color: t[role], symbolColor: t.symbol, height: TITLE_H, bg: t.bg[kind] || t.bg.dialog };
+    return { color: t[role], symbolColor: t.symbol, height: OVERLAY_H, bg: t.bg[kind] || t.bg.dialog };
   }
 
   applyTheme() {
@@ -43,7 +47,7 @@ class Windows {
       const c = this.chromeFor(kind);
       try {
         w.setBackgroundColor(c.bg);
-        if (kind !== 'player') w.setTitleBarOverlay({ color: c.color, symbolColor: c.symbolColor, height: TITLE_H });
+        if (kind !== 'player') w.setTitleBarOverlay({ color: c.color, symbolColor: c.symbolColor, height: OVERLAY_H });
       } catch {
         /* overlay not supported on this platform */
       }
@@ -66,7 +70,7 @@ class Windows {
       parent,
       backgroundColor: c.bg,
       titleBarStyle: kind === 'player' ? 'default' : 'hidden',
-      titleBarOverlay: kind === 'player' ? undefined : { color: c.color, symbolColor: c.symbolColor, height: TITLE_H },
+      titleBarOverlay: kind === 'player' ? undefined : { color: c.color, symbolColor: c.symbolColor, height: OVERLAY_H },
       autoHideMenuBar: true,
       webPreferences: {
         preload: PRELOAD,

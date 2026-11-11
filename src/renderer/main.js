@@ -209,6 +209,7 @@
     const toggleSrc = running ? 'assets/icons/row-pause.svg' : 'assets/icons/row-play.svg';
     if (p.toggleImg.getAttribute('src') !== toggleSrc) p.toggleImg.src = toggleSrc;
     p.toggle.title = running ? 'Pause' : d.status === 'error' ? 'Retry' : 'Resume';
+    p.x.title = d.status === 'canceled' ? 'Remove from list' : 'Cancel';
     p.bar.className = `bar ${running ? '' : d.status}${running && !(d.size > 0) ? ' indeterminate' : ''}`;
     p.fill.style.width = `${pct(d)}%`;
     let left = '';
@@ -221,6 +222,10 @@
       left = 'Queued';
       mid = d.size > 0 ? `${Math.floor(pct(d))}%` : '';
     } else if (d.status === 'paused') mid = d.size > 0 ? `${Math.floor(pct(d))}%` : 'Paused';
+    else if (d.status === 'canceled') {
+      left = 'Canceled';
+      mid = d.size > 0 && d.downloaded > 0 ? `${Math.floor(pct(d))}%` : '';
+    }
     else if (d.status === 'error') left = d.error || 'Error';
     p.speed.textContent = left;
     p.speed.title = d.status === 'error' ? left : '';

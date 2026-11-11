@@ -181,6 +181,36 @@ test('dynamic segmentation splits the slow segment', async () => {
   await m.shutdown();
 });
 
+test('cancel keeps the download in the list (Canceled) and Resume continues', async () => {
+  const slow = await startServer(DATA, { bytesPerSec: 768 * 1024 });
+  const { m } = makeManager({ connections: 4 });
+  const dl = m.add({ url: `${slow.base}/file/cancel.bin`, mode: 'queue' });
+  m.startQueue();
+  await new Promise((r) => setTimeout(r, 1200));
+  await m.cancel(dl.id);
+  assert.strictEqual(dl.d.status, 'canceled');
+  assert.strictEqual(dl.d.queued, false, 'a canceled item leaves the queue');
+  assert.ok(m.list().some((d) => d.id === dl.id), 'still listed');
+  const kept = dl.flushedBytes();
+  assert.ok(kept > 0 && fs.existsSync(dl.tempPath), 'partial data kept');
+  // survives a restart as "canceled"
+  m.saveNow();
+  const m2 = new (require('../src/main/engine/manager').Manager)({ file: m.file, getSettings: m.getSettings, getProxy: () => null });
+  m2.load();
+  assert.strictEqual(m2.get(dl.id).d.status, 'canceled');
+  m2.resumeAll();
+  assert.strictEqual(m2.get(dl.id).running, false, 'Resume all leaves canceled items alone');
+  await m.shutdown();
+  // explicit resume continues where it stopped
+  m.startTimers();
+  m.start(dl.id);
+  await waitFor(dl);
+  assert.strictEqual(dl.d.status, 'completed', dl.d.error);
+  assert.strictEqual(fileSha(dl.d.savePath), DATA_SHA);
+  slow.server.close();
+  await m.shutdown();
+});
+
 test('403 becomes a readable error', async () => {
   const { m } = makeManager();
   const dl = m.add({ url: `${srv.base}/forbidden`, mode: 'now' });
