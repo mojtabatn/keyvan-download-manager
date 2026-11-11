@@ -43,7 +43,7 @@
   --track: #ececec;
   --paused: #b5b5b5;
   --hover: #f5f5f5;
-  --select: rgba(30, 131, 241, 0.08);
+  --select: #ececec;
   --btn2-bg: #f5f5f5;
   --btn2-text: #5f5f5f;
   --outline-bg: transparent;
@@ -82,7 +82,7 @@
   --track: #5f5f5f;
   --paused: #b5b5b5;
   --hover: #2a282f;
-  --select: rgba(21, 138, 255, 0.14);
+  --select: rgba(255, 255, 255, 0.09);
   --btn2-bg: transparent;
   --btn2-text: #ececec;
   --title-bg: #141218;

@@ -40,38 +40,43 @@
         </nav>
         <div class="side-foot">
           <div class="total-speed" id="totalSpeed" hidden></div>
-          <div class="version" id="version">Version 1.2.0</div>
+          <div class="foot-row">
+            <button class="gh" id="github" title="Project on GitHub">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+            </button>
+            <div class="version" id="version">Version 0.1</div>
+          </div>
         </div>
       </aside>
 
       <section class="content">
         <div class="toolbar">
-          <div class="search" id="search">
-            <button class="search-icon" id="searchBtn" title="Search (Ctrl+F)"><img src="assets/icons/search.svg" alt="" /></button>
+          <div class="tool-box search" id="search">
+            <span class="search-icon"><img src="assets/icons/search.svg" alt="" /></span>
             <input id="searchInput" type="text" placeholder="Search..." spellcheck="false" />
             <button class="search-clear" id="searchClear" title="Clear"><img src="assets/icons/search-clear.svg" alt="" /></button>
           </div>
-          <div class="conn" id="conn">
-            <button class="conn-btn" id="connBtn">
-              <span class="shield" id="connShield"></span>
-              <span class="conn-label" id="connLabel">Normal Connection</span>
-              <span class="chev"><img src="assets/icons/chevron-down.svg" alt="" class="only-light" /><img src="assets/icons/chevron-down-dark.svg" alt="" class="only-dark" /></span>
+          <div class="tool-box actions" id="actions">
+            <button class="tool-btn resume" id="actResume" data-tip="Resume" disabled>
+              <svg viewBox="0 0 24 24" fill="none"><path d="M7.25 5.9v12.2c0 1 1.1 1.6 1.93 1.05l9.15-6.1a1.25 1.25 0 0 0 0-2.1L9.18 4.85C8.35 4.3 7.25 4.9 7.25 5.9Z" fill="currentColor" fill-opacity=".2" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
             </button>
-            <div class="conn-menu" id="connMenu" hidden>
-              <button class="conn-opt" data-mode="normal">
-                <img src="assets/icons/shield-off.svg" alt="" class="only-light" /><img src="assets/icons/shield-off-dark.svg" alt="" class="only-dark" />
-                <span>Normal Connection</span>
-              </button>
-              <button class="conn-opt" data-mode="secure">
-                <img src="assets/icons/shield-on.svg" alt="" />
-                <span>Secure Connection</span>
-              </button>
-              <div class="conn-foot">
-                <span id="proxyAddr">SOCKS5 127.0.0.1:10808</span>
-                <button id="proxyTest">Test</button>
-                <button id="proxyEdit">Edit</button>
-              </div>
-            </div>
+            <button class="tool-btn pause" id="actPause" data-tip="Pause" disabled>
+              <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.75" fill="currentColor" fill-opacity=".16" stroke="currentColor" stroke-width="1.5"/><path d="M10 9.25v5.5M14 9.25v5.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </button>
+            <button class="tool-btn stop" id="actStop" data-tip="Stop all downloads" disabled>
+              <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.75" fill="currentColor" fill-opacity=".16" stroke="currentColor" stroke-width="1.5"/><rect x="9.25" y="9.25" width="5.5" height="5.5" rx="1.2" stroke="currentColor" stroke-width="1.5"/></svg>
+            </button>
+            <button class="tool-btn delete" id="actDelete" data-tip="Delete" disabled>
+              <svg viewBox="0 0 24 24" fill="none"><path d="M6.6 7.5l.75 10.6a2 2 0 0 0 2 1.9h5.3a2 2 0 0 0 2-1.9l.75-10.6" fill="currentColor" fill-opacity=".2"/><path d="M4.75 7.5h14.5M9.5 7.25V5.6c0-.75.6-1.35 1.35-1.35h2.3c.75 0 1.35.6 1.35 1.35v1.65M6.6 7.5l.75 10.6a2 2 0 0 0 2 1.9h5.3a2 2 0 0 0 2-1.9l.75-10.6M10.25 10.75v5.5M13.75 10.75v5.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
+          <div class="tool-box view-switch" id="viewSwitch">
+            <button class="tool-btn on" data-view-mode="cards" data-tip="Large icons">
+              <svg viewBox="0 0 24 24" fill="none"><rect x="4.25" y="4.75" width="15.5" height="14.5" rx="2.5" stroke="currentColor" stroke-width="1.6"/><path d="M4.25 9.6h15.5M4.25 14.4h15.5" stroke="currentColor" stroke-width="1.6"/></svg>
+            </button>
+            <button class="tool-btn" data-view-mode="compact" data-tip="Compact list">
+              <svg viewBox="0 0 24 24" fill="none"><circle cx="5.5" cy="7" r="1.15" fill="currentColor"/><circle cx="5.5" cy="12" r="1.15" fill="currentColor"/><circle cx="5.5" cy="17" r="1.15" fill="currentColor"/><path d="M9.5 7h10M9.5 12h10M9.5 17h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </button>
           </div>
         </div>
 

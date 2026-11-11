@@ -63,18 +63,13 @@ const T = (name, p, ms = 15000) =>
   await sleep(1200);
   await shot(main, `main-${theme}`);
 
-  // Search opened
-  await main.click('#searchBtn');
+  // Compact list view
+  await main.click('[data-view-mode="compact"]');
   await sleep(400);
-  await shot(main, `main-search-${theme}`);
-  await main.keyboard.press('Escape');
-
-  // Connection dropdown
-  await main.click('#connBtn');
-  await sleep(250);
-  await shot(main, `main-conn-menu-${theme}`);
-  await main.click('.conn-opt[data-mode="secure"]');
-  await sleep(600);
+  await shot(main, `main-compact-${theme}`);
+  await main.click('[data-view-mode="cards"]');
+  await T('connection secure', main.evaluate(() => window.api.invoke('connection:set', 'secure')));
+  await sleep(300);
 
   // Scheduled + Settings views
   await main.evaluate(() => window.api.invoke('downloads:add', { url: 'http://127.0.0.1:9/later/ubuntu-24.04-desktop-amd64.iso', mode: 'queue', filename: 'ubuntu-24.04-desktop-amd64.iso' }));

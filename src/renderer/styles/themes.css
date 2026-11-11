@@ -236,8 +236,7 @@
 .theme-preview[data-t='retro'] * { border-radius: 0 !important; }
 :root[data-theme='retro'] body.dialog { --title-bg: #000080; --title-line: #000080; }
 :root[data-theme='retro'] .card,
-:root[data-theme='retro'] .conn-btn,
-:root[data-theme='retro'] .search,
+:root[data-theme='retro'] .tool-box,
 :root[data-theme='retro'] .nav-item.active,
 :root[data-theme='retro'] .btn,
 :root[data-theme='retro'] .btn-add,

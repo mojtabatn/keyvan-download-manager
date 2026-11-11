@@ -148,6 +148,7 @@ window.SettingsView = (function () {
       group(
         'Secure connection',
         'proxy',
+        row('Use secure connection', 'New downloads go through the proxy below. Each download can also be switched in its window.', toggle((x) => x.connectionMode === 'secure', (v) => save({ connectionMode: v ? 'secure' : 'normal' }))),
         el('div', { class: 'set-hint', style: 'margin:-2px 0 10px;font-size:12px', text: 'When “Secure Connection” is on, downloads go through your local proxy (v2rayN / Xray / Clash). v2rayN defaults: SOCKS5 127.0.0.1:10808 or HTTP 10809.' }),
         proxyEditor()
       ),

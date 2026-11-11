@@ -32,6 +32,7 @@ const INVOKE = new Set([
   'power:cancel',
   'power:state',
   'shell:openPath',
+  'shell:openProject',
 ]);
 
 const EVENTS = new Set([

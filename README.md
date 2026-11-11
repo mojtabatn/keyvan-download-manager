@@ -30,7 +30,7 @@ A minimal, fast download manager for Windows, built from the Figma design
 
 ## Install
 
-1. Run `DownloadManager-Setup-1.2.0.exe` (or use `DownloadManager-Portable-1.2.0.exe`, which needs no installation).
+1. Run `DownloadManager-Setup-0.1.0.exe` (or use `DownloadManager-Portable-0.1.0.exe`, which needs no installation).
 2. The build isn't code-signed, so Windows SmartScreen may warn you. Click **More info → Run anyway**.
 
 ### Browser extension

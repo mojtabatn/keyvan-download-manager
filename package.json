@@ -1,7 +1,7 @@
 {
   "name": "minimal-download-manager",
   "productName": "Download Manager",
-  "version": "1.2.0",
+  "version": "0.1.0",
   "description": "A minimal, fast, multi-connection download manager for Windows",
   "main": "src/main/main.js",
   "author": "Mojtaba",
@@ -30,7 +30,7 @@
   "build": {
     "appId": "com.mojtaba.downloadmanager",
     "productName": "Download Manager",
-    "copyright": "Copyright © 2026 Mojtaba",
+    "copyright": "Copyright \u00a9 2026 Mojtaba",
     "directories": {
       "output": "dist",
       "buildResources": "build"

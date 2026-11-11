@@ -11,6 +11,7 @@
     selected: null,
     settings: null,
     queueRunning: false,
+    listView: 'cards', // 'cards' (large icons) | 'compact' (list without icons)
   };
   const rows = new Map(); // id -> { row, divider, parts }
 
@@ -23,12 +24,13 @@
       api.invoke('queue:state'),
       api.invoke('power:state'),
     ]);
-    $('version').textContent = `Version ${info.version}`;
+    $('version').textContent = `Version ${String(info.version).replace(/\.0$/, '')}`;
     DM.appInfo = info;
     state.settings = settings;
+    state.listView = settings.listView || 'cards';
     state.queueRunning = q.running;
     for (const d of list) state.items.set(d.id, d);
-    renderConnection();
+    renderViewSwitch();
     renderAll();
     renderQueuePanel();
     if (pending) showPower(pending);
@@ -63,15 +65,20 @@
   api.on('queue:state', (q) => {
     state.queueRunning = q.running;
     renderQueuePanel();
+    updateActions();
   });
   api.on('settings:changed', (s) => {
     state.settings = s;
-    renderConnection();
+    if ((s.listView || 'cards') !== state.listView) {
+      state.listView = s.listView || 'cards';
+      renderViewSwitch();
+      renderAll();
+    }
     renderQueuePanel();
     SettingsView.update(s);
   });
   api.on('power:pending', showPower);
-  api.on('ui:command', (c) => c === 'search' && openSearch());
+  api.on('ui:command', (c) => c === 'search' && focusSearch());
 
   let speedTimer;
   function setTotalSpeed(speed, n) {
@@ -101,9 +108,11 @@
     const waiting = all.filter((d) => d.queued && d.status !== 'completed').length;
     $('badgeQueue').textContent = waiting ? String(waiting) : '';
 
-    if (state.view === 'settings') return;
+    if (state.view === 'settings') return updateActions();
     const listEl = state.view === 'scheduled' ? $('qlist') : $('list');
     const items = visibleItems();
+    listEl.classList.toggle('compact', state.listView === 'compact');
+    if (state.selected && !items.some((d) => d.id === state.selected)) state.selected = null;
     // Re-use existing row elements so hover/selection survive updates.
     const frag = document.createDocumentFragment();
     const keep = new Set();
@@ -152,6 +161,7 @@
         }
       }
     }
+    updateActions();
   }
 
   function buildRow(d) {
@@ -170,7 +180,9 @@
     const size = el('span', { class: 'size' });
     const meta = el('div', { class: 'meta' }, speed, eta, size);
     const doneMeta = el('div', { class: 'done-meta' });
-    const row = el('div', { class: 'row', tabindex: '-1' }, cat, name, acts, bar, meta, doneMeta);
+    const cSize = el('div', { class: 'c-size' });
+    const cStat = el('div', { class: 'c-stat' });
+    const row = el('div', { class: 'row', tabindex: '-1' }, cat, name, acts, bar, meta, doneMeta, cSize, cStat);
     const divider = el('div', { class: 'divider' });
     const id = d.id;
     toggle.addEventListener('click', (e) => {
@@ -181,14 +193,17 @@
       e.stopPropagation();
       api.invoke('downloads:action', { id, action: 'cancel' });
     });
-    row.addEventListener('click', () => select(id));
+    row.addEventListener('click', (e) => {
+      e.stopPropagation();
+      select(id);
+    });
     row.addEventListener('dblclick', () => api.invoke('downloads:action', { id, action: 'open' }));
     row.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       select(id);
       api.invoke('downloads:contextMenu', id);
     });
-    return { row, divider, parts: { cat, shield, nameText, name, toggle, toggleImg, x, bar, fill, speed, eta, size, doneMeta }, key: '' };
+    return { row, divider, parts: { cat, shield, nameText, name, toggle, toggleImg, x, bar, fill, speed, eta, size, doneMeta, cSize, cStat }, key: '' };
   }
 
   function fillRow(r, d) {
@@ -201,6 +216,11 @@
     p.shield.hidden = !d.secure || done;
     if (p.nameText.textContent !== d.filename) p.nameText.textContent = d.filename;
     p.name.title = d.filename;
+    // compact-list cells
+    p.cSize.textContent = d.size > 0 ? fmtBytes(d.size) : d.downloaded > 0 ? fmtBytes(d.downloaded) : '—';
+    p.cStat.textContent = compactStatus(d);
+    p.cStat.className = `c-stat ${d.status}`;
+    p.cStat.title = d.status === 'error' ? d.error || '' : '';
     if (done) {
       p.doneMeta.textContent = `${fmtBytes(d.size)}${d.completedAt ? ' · ' + new Date(d.completedAt).toLocaleDateString() : ''}`;
       return;
@@ -233,15 +253,69 @@
     p.size.textContent = fmtSizePair(d);
   }
 
+  function compactStatus(d) {
+    const p = d.size > 0 ? `${Math.floor(pct(d))}%` : '';
+    switch (d.status) {
+      case 'completed': return 'Completed';
+      case 'downloading': return [p, fmtSpeed(d.speed)].filter(Boolean).join(' · ');
+      case 'connecting': return 'Connecting…';
+      case 'paused': return ['Paused', p].filter(Boolean).join(' · ');
+      case 'queued': return 'Queued';
+      case 'canceled': return 'Canceled';
+      case 'error': return 'Error';
+      default: return '';
+    }
+  }
+
   function updateRow(d) {
     const r = rows.get(d.id);
     if (r) fillRow(r, d);
+    if (d.id === state.selected) updateActions();
   }
 
   function select(id) {
     state.selected = id;
     for (const [rid, r] of rows) r.row.classList.toggle('selected', rid === id);
+    updateActions();
   }
+
+  // ------------------------------------------------------------ actions toolbar
+  const isRunning = (d) => d && (d.status === 'downloading' || d.status === 'connecting');
+  function updateActions() {
+    const d = state.selected ? state.items.get(state.selected) : null;
+    const resume = $('actResume');
+    resume.disabled = !(d && ['paused', 'error', 'canceled', 'queued'].includes(d.status));
+    resume.dataset.tip = d && d.status === 'error' ? 'Retry' : 'Resume';
+    $('actPause').disabled = !(d && (isRunning(d) || d.status === 'queued'));
+    $('actStop').disabled = ![...state.items.values()].some((x) => isRunning(x) || (x.status === 'queued' && state.queueRunning));
+    $('actDelete').disabled = !d;
+  }
+  $('actResume').addEventListener('click', () => state.selected && api.invoke('downloads:action', { id: state.selected, action: 'start' }));
+  $('actPause').addEventListener('click', () => state.selected && api.invoke('downloads:action', { id: state.selected, action: 'pause' }));
+  $('actStop').addEventListener('click', () => api.invoke('downloads:pauseAll'));
+  $('actDelete').addEventListener('click', () => state.selected && api.invoke('downloads:action', { id: state.selected, action: 'delete' }));
+  // clicking empty space in a list clears the selection
+  for (const id of ['list', 'qlist']) $(id).addEventListener('click', () => select(null));
+
+  // ------------------------------------------------------------ view switch (large icons / compact list)
+  function renderViewSwitch() {
+    for (const b of document.querySelectorAll('[data-view-mode]')) b.classList.toggle('on', b.dataset.viewMode === state.listView);
+  }
+  for (const b of document.querySelectorAll('[data-view-mode]')) {
+    b.addEventListener('click', () => {
+      if (state.listView === b.dataset.viewMode) return;
+      state.listView = b.dataset.viewMode;
+      renderViewSwitch();
+      renderAll();
+      api.invoke('settings:set', { listView: state.listView });
+    });
+  }
+
+  // ------------------------------------------------------------ footer
+  $('github').addEventListener('click', async () => {
+    const ok = await api.invoke('shell:openProject');
+    if (!ok) toast('Project link will be added soon');
+  });
 
   // ------------------------------------------------------------ navigation
   $('nav').addEventListener('click', (e) => {
@@ -290,91 +364,30 @@
     if (urls.length) openAdd(urls.join('\n'));
   });
 
-  // ------------------------------------------------------------ search
+  // ------------------------------------------------------------ search (always open)
   const search = $('search');
   const input = $('searchInput');
-  function openSearch() {
-    search.classList.add('open');
-    setTimeout(() => input.focus(), 60);
+  function focusSearch() {
+    input.focus();
+    input.select();
   }
-  $('searchBtn').addEventListener('click', () => (search.classList.contains('open') ? input.focus() : openSearch()));
+  function setQuery(v) {
+    state.query = v.trim();
+    search.classList.toggle('has-text', !!input.value);
+    renderAll();
+  }
+  input.addEventListener('input', () => setQuery(input.value));
   $('searchClear').addEventListener('click', () => {
     input.value = '';
-    state.query = '';
-    renderAll();
-    search.classList.remove('open');
-  });
-  input.addEventListener('input', () => {
-    state.query = input.value.trim();
-    renderAll();
-  });
-  input.addEventListener('blur', () => {
-    if (!input.value) search.classList.remove('open');
+    setQuery('');
+    input.focus();
   });
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       input.value = '';
-      state.query = '';
-      renderAll();
+      setQuery('');
       input.blur();
     }
-  });
-
-  // ------------------------------------------------------------ connection (Normal / Secure)
-  const conn = $('conn');
-  function renderConnection() {
-    const s = state.settings;
-    if (!s) return;
-    const secure = s.connectionMode === 'secure';
-    $('connLabel').textContent = secure ? 'Secure Connection' : 'Normal Connection';
-    const sh = $('connShield');
-    sh.replaceChildren();
-    if (secure) sh.append(icon('shield-on'));
-    else sh.append(DM.themedIcon('shield-off'));
-    for (const o of document.querySelectorAll('.conn-opt')) o.classList.toggle('current', o.dataset.mode === s.connectionMode);
-    const p = s.proxy;
-    $('proxyAddr').textContent = `${p.type === 'http' ? 'HTTP' : 'SOCKS5'} ${p.host}:${p.port}`;
-  }
-  $('connBtn').addEventListener('click', (e) => {
-    e.stopPropagation();
-    const open = $('connMenu').hidden;
-    $('connMenu').hidden = !open;
-    conn.classList.toggle('open', open);
-  });
-  document.addEventListener('click', (e) => {
-    if (!conn.contains(e.target)) {
-      $('connMenu').hidden = true;
-      conn.classList.remove('open');
-    }
-  });
-  for (const o of document.querySelectorAll('.conn-opt')) {
-    o.addEventListener('click', async () => {
-      await api.invoke('connection:set', o.dataset.mode);
-      $('connMenu').hidden = true;
-      conn.classList.remove('open');
-      if (o.dataset.mode === 'secure') testProxy(true);
-    });
-  }
-  async function testProxy(quiet) {
-    const btn = $('connBtn');
-    btn.querySelector('.dot')?.remove();
-    if (!quiet) toast('Testing secure connection…');
-    const r = await api.invoke('connection:test');
-    const dot = el('span', { class: `dot ${r.ok ? 'ok' : 'bad'}`, title: r.ok ? `Proxy OK · ${r.ms} ms` : r.error });
-    btn.append(dot);
-    setTimeout(() => dot.remove(), 8000);
-    if (r.ok) toast(`Secure connection works · ${r.ms} ms`);
-    else toast(r.error || 'Secure connection failed', 4500);
-  }
-  $('proxyTest').addEventListener('click', (e) => {
-    e.stopPropagation();
-    testProxy(false);
-  });
-  $('proxyEdit').addEventListener('click', () => {
-    $('connMenu').hidden = true;
-    conn.classList.remove('open');
-    setView('settings');
-    SettingsView.focus('proxy');
   });
 
   // ------------------------------------------------------------ scheduled / queue panel
@@ -453,11 +466,13 @@
       openAdd();
     } else if (e.ctrlKey && e.key.toLowerCase() === 'f') {
       e.preventDefault();
-      openSearch();
+      focusSearch();
     } else if (!id) {
       return;
+    } else if (e.key === 'Escape') {
+      select(null);
     } else if (e.key === 'Delete') {
-      api.invoke('downloads:action', { id, action: 'cancel' });
+      api.invoke('downloads:action', { id, action: 'delete' });
     } else if (e.key === 'Enter') {
       api.invoke('downloads:action', { id, action: 'open' });
     } else if (e.key === ' ') {

@@ -400,6 +400,27 @@ async function runAction(win, { id, action, value }) {
     case 'remove':
       if (s.status === 'completed' || (await confirmRemove(win, s))) await manager.remove(id);
       break;
+    case 'delete': {
+      // Toolbar "Delete": take the item off the list (optionally the file too).
+      const done = s.status === 'completed';
+      const opts = {
+        type: 'question',
+        buttons: ['Delete', 'Cancel'],
+        defaultId: 1,
+        cancelId: 1,
+        noLink: true,
+        title: 'Download Manager',
+        message: `Delete “${s.filename}”?`,
+        detail: done ? 'It will be removed from the list.' : 'The download stops and is removed from the list; the partially downloaded data is deleted.',
+      };
+      if (done && fs.existsSync(s.savePath)) {
+        opts.checkboxLabel = 'Also delete the file from disk';
+        opts.checkboxChecked = false;
+      }
+      const { response, checkboxChecked } = await dialog.showMessageBox(win, opts);
+      if (response === 0) await manager.remove(id, { deleteFile: done && !!checkboxChecked });
+      break;
+    }
     case 'deleteFile': {
       const { response } = await dialog.showMessageBox(win, {
         type: 'warning',
@@ -615,6 +636,23 @@ function registerIpc() {
   h('power:cancel', () => power.cancel());
   h('power:state', () => (power.pending ? { action: power.pending.action } : null));
   h('shell:openPath', (_e, p) => shell.openPath(String(p || '')));
+  h('shell:openProject', () => {
+    const url = projectUrl();
+    if (!url) return false;
+    shell.openExternal(url);
+    return true;
+  });
+}
+
+/** The project's GitHub page (package.json "homepage"); only https GitHub links are opened. */
+function projectUrl() {
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(app.getAppPath(), 'package.json'), 'utf8'));
+    const url = String(pkg.homepage || '');
+    return /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+/.test(url) ? url : '';
+  } catch {
+    return '';
+  }
 }
 
 function sameHost(a, b) {
