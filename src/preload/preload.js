@@ -36,6 +36,9 @@ const INVOKE = new Set([
   'media:update',
   'media:isVideoPage',
   'media:probe',
+  'update:state',
+  'update:check',
+  'update:action',
 ]);
 
 const EVENTS = new Set([
@@ -48,6 +51,7 @@ const EVENTS = new Set([
   'theme:changed',
   'power:pending',
   'toast',
+  'update:state',
   'ui:command',
   'media:install-progress',
 ]);

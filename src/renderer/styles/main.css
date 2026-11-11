@@ -68,6 +68,39 @@
 .side-foot { margin-top: auto; padding: 0 0 4px 8px; }
 .total-speed { font-size: 12px; font-weight: 700; color: var(--blue); margin: 0 0 8px 8px; }
 .foot-row { display: flex; align-items: center; gap: 8px; }
+/* "Update Available!" (Figma): red pill above the GitHub/version row */
+.update-btn {
+  position: relative;
+  overflow: hidden;
+  width: 172px;
+  height: 32px;
+  margin: 0 0 12px -8px;
+  padding: 0 12px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: #ff2d55;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  box-shadow: 0 2px 8px rgba(255, 45, 85, 0.25);
+  animation: update-in 0.25s ease-out;
+}
+.update-btn[hidden] { display: none; }
+.update-btn:hover:not(.busy) { filter: brightness(1.06); }
+.update-btn:active:not(.busy) { transform: translateY(1px); }
+.update-btn.busy { cursor: default; }
+.update-btn .u-label { position: relative; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.update-btn .u-ic { position: relative; width: 16px; height: 16px; flex: none; }
+.update-btn .u-ic-restart, .update-btn.ready .u-ic-get, .update-btn.busy .u-ic-get { display: none; }
+.update-btn.ready .u-ic-restart { display: block; }
+.update-btn .u-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: rgba(255, 255, 255, 0.22); transition: width 0.2s; }
+.update-btn.busy .u-fill { display: block; }
+.update-btn:not(.busy) .u-fill { display: none; }
+@keyframes update-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 .gh { width: 24px; height: 24px; display: grid; place-items: center; border-radius: 6px; color: var(--gh, #000); }
 :root[data-base='dark'] .gh { color: #fff; }
 .gh svg { width: 18px; height: 18px; display: block; }

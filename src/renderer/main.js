@@ -318,6 +318,42 @@
     if (!ok) toast('Project link will be added soon');
   });
 
+  // ------------------------------------------------------------ update button (GitHub Releases)
+  function renderUpdate(st) {
+    const btn = $('updateBtn');
+    window.dispatchEvent(new CustomEvent('kdm-update', { detail: st }));
+    const show = st && (['available', 'downloading', 'ready'].includes(st.status) || (st.status === 'error' && st.stage === 'download'));
+    btn.hidden = !show;
+    if (!show) return;
+    btn.classList.toggle('busy', st.status === 'downloading');
+    btn.classList.toggle('ready', st.status === 'ready');
+    let label = 'Update Available!';
+    let tip = `KDM ${st.version} is available. Click to download it.`;
+    if (st.status === 'available' && (st.portable || !st.asset)) tip = `KDM ${st.version} is available. Click to open the download page.`;
+    if (st.status === 'downloading') {
+      const p = st.progress && st.progress.total ? Math.min(100, Math.floor((st.progress.received / st.progress.total) * 100)) : 0;
+      label = `Downloading… ${p}%`;
+      tip = `Downloading KDM ${st.version}`;
+      $('updateFill').style.width = p + '%';
+    }
+    if (st.status === 'ready') {
+      label = 'Restart to Update';
+      tip = `KDM ${st.version} is ready. Click to install it and restart.`;
+    }
+    if (st.status === 'error') {
+      label = 'Update failed · Retry';
+      tip = st.error || 'The update could not be downloaded.';
+    }
+    $('updateLabel').textContent = label;
+    btn.title = tip;
+  }
+  $('updateBtn').addEventListener('click', async () => {
+    if ($('updateBtn').classList.contains('busy')) return;
+    renderUpdate(await api.invoke('update:action'));
+  });
+  api.on('update:state', renderUpdate);
+  api.invoke('update:state').then(renderUpdate);
+
   // ------------------------------------------------------------ navigation
   $('nav').addEventListener('click', (e) => {
     const b = e.target.closest('.nav-item');

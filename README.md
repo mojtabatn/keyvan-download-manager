@@ -109,6 +109,8 @@ colors the window title bar to match.
 - Canceled downloads stay in the list so you can restart them later
 - Tray icon, progress on the taskbar button, notifications, and the PC stays awake while downloading
 - SHA-256 checksum of finished files
+- **Automatic updates**: KDM checks GitHub Releases, shows an *Update Available!* button in the sidebar, downloads
+  the new version and installs it with one click (can be turned off in Settings → About)
 - Keyboard shortcuts: `Ctrl+N` add link · `Ctrl+F` search · `Ctrl+V` paste links · `Space` pause or resume ·
   `Enter` open · `Delete` cancel or remove
 
@@ -158,6 +160,13 @@ Project layout:
 | `scripts/` | End-to-end checks that drive the real app and browser; `readme-shots.js` makes these screenshots |
 
 The UI uses the **Manrope** font (bundled, SIL Open Font License), so it looks the same on every PC.
+
+## Publishing a new version
+
+1. Raise `version` in `package.json` (for example `0.2.0`) and run `npm run dist:win`.
+2. On GitHub, create a release with the tag `v0.2.0` and attach `KDM-Setup-0.2.0.exe` and `KDM-Portable-0.2.0.exe`
+   (keep these file names).
+3. Installed copies of KDM find it within a few hours, or right away with **Settings → About → Check now**.
 
 ## License
 

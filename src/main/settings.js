@@ -16,6 +16,7 @@ function defaults(downloadsDir) {
     maxRetries: 10,
     listView: 'cards', // 'cards' (large icons) | 'compact' (list without icons)
     videoQuality: 'best', // preselected quality: 'best' | '2160' | '1080' | '720' | '480' | '360' | 'audio'
+    autoUpdate: true, // check GitHub Releases for new versions
     videoButton: true, // show the "Download video" button on web pages (browser extension)
     showProgressWindow: true,
     showCompleteWindow: true,

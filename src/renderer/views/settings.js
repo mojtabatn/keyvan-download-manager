@@ -54,6 +54,31 @@ window.SettingsView = (function () {
     );
   }
 
+  /** "Check now" plus the result of the last check. */
+  function updateRow() {
+    const hint = el('div', { class: 'set-hint', text: 'Not checked yet.' });
+    const btn = el('button', { class: 'btn btn-outline text-only', style: 'height:30px;padding:0 12px;font-size:13px', text: 'Check now' });
+    const show = (st) => {
+      if (!st) return;
+      const when = st.checkedAt ? new Date(st.checkedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+      const text = {
+        idle: 'Not checked yet.',
+        checking: 'Checking…',
+        none: `You have the latest version${when ? ` (checked at ${when})` : ''}.`,
+        available: `Version ${st.version} is available. Use the red button in the sidebar.`,
+        downloading: `Downloading version ${st.version}…`,
+        ready: `Version ${st.version} is ready. Click “Restart to Update” in the sidebar.`,
+        error: `Couldn’t check for updates: ${st.error || 'unknown error'}.`,
+      }[st.status];
+      hint.textContent = text || '';
+      btn.disabled = st.status === 'checking' || st.status === 'downloading';
+    };
+    btn.addEventListener('click', async () => show(await api.invoke('update:check')));
+    window.addEventListener('kdm-update', (e) => show(e.detail));
+    api.invoke('update:state').then(show);
+    return el('div', { class: 'set-row' }, el('div', { class: 'set-text' }, el('div', { class: 'set-label', text: 'Updates' }), hint), btn);
+  }
+
   function themePicker() {
     const cards = THEMES.map(([id, name]) => {
       const card = el('button', { class: 'theme-card', title: `${name} theme`, onclick: () => save({ theme: id }) }, miniPreview(id), el('span', { text: name }));
@@ -179,7 +204,9 @@ window.SettingsView = (function () {
           { class: 'about', style: 'padding:4px 0 8px' },
           el('img', { src: 'assets/icons/logo.svg', alt: '' }),
           el('div', {}, el('div', { class: 'set-label', text: `Keyvan Download Manager ${String(info.version).replace(/\.0$/, '')}` }), el('div', { class: 'set-hint', text: 'KDM · minimal, multi-connection download manager.' }))
-        )
+        ),
+        row('Check for updates automatically', 'KDM looks for new versions on GitHub and shows a button when one is ready.', toggle((x) => x.autoUpdate !== false, (v) => save({ autoUpdate: v }))),
+        updateRow()
       )
     );
     update(settings);

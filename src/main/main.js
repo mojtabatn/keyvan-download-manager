@@ -31,6 +31,7 @@ const { watchClipboard } = require('./integration/clipboard');
 const { PowerActions } = require('./power');
 const { Components } = require('./media/components');
 const { probeMedia, isVideoPage } = require('./media/media');
+const { Updater } = require('./updater');
 
 const APP_ID = 'com.mojtaba.kdm';
 const ASSETS = path.join(__dirname, '..', 'renderer', 'assets');
@@ -67,6 +68,8 @@ let tray;
 let clip;
 let power;
 let tools;
+let updater;
+let pendingInstall = null; // installer to run once the app has shut down
 let blockerId = null;
 let quitting = false;
 let shutdownDone = false;
@@ -131,6 +134,7 @@ app.whenReady().then(() => {
     windows.broadcast('theme:changed', theme());
   });
 
+  startUpdater();
   handleArgv(process.argv);
 });
 
@@ -151,6 +155,7 @@ app.on('before-quit', (e) => {
     .catch(() => {})
     .finally(() => {
       shutdownDone = true;
+      if (pendingInstall) runInstaller(pendingInstall);
       app.quit();
     });
 });
@@ -357,6 +362,7 @@ function onSettingsChanged(s, prev) {
   if (s.speedLimit !== prev.speedLimit) manager.setSpeedLimit(s.speedLimit);
   if (s.launchAtStartup !== prev.launchAtStartup) applyLoginItem();
   if (s.maxConcurrent !== prev.maxConcurrent) manager.pump();
+  if (s.autoUpdate !== prev.autoUpdate) startUpdater();
   if (s.preventSleep !== prev.preventSleep) updateSleepBlocker(lastActivity.active > 0);
   windows.broadcast('settings:changed', s);
 }
@@ -686,6 +692,9 @@ function registerIpc() {
     }
     return { error: lastError };
   });
+  h('update:state', () => (updater ? updater.state : null));
+  h('update:check', () => (updater ? updater.check() : null));
+  h('update:action', (e) => updateAction(senderWindow(e)));
   h('shell:openProject', () => {
     const url = projectUrl();
     if (!url) return false;
@@ -695,6 +704,70 @@ function registerIpc() {
 }
 
 /** The project's GitHub page (package.json "homepage"); only https GitHub links are opened. */
+// ---------------------------------------------------------------- updates (GitHub Releases)
+function startUpdater() {
+  if (!updater) {
+    const repo = (projectUrl().match(/^https:\/\/github\.com\/([\w.-]+\/[\w.-]+)/) || [])[1];
+    if (!repo) return;
+    // DM_UPDATE_API points the dev build at a local test server (ignored in the packaged app)
+    const testApi = !app.isPackaged && process.env.DM_UPDATE_API;
+    updater = new Updater({
+      version: app.getVersion(),
+      repo: repo.replace(/\.git$/, ''),
+      cacheDir: path.join(app.getPath('userData'), 'updates'),
+      portable: !!process.env.PORTABLE_EXECUTABLE_FILE,
+      ...(testApi ? { apiBase: testApi, allowedPrefixes: [testApi] } : {}),
+    });
+    updater.cleanup();
+    updater.on('state', (st) => windows.broadcast('update:state', st));
+  }
+  updater.start({ enabled: () => settings.get().autoUpdate !== false, delay: Number(process.env.DM_UPDATE_DELAY) || 8000 });
+}
+
+/** Button in the sidebar: download → (ready) restart and install; the portable build opens the release page. */
+async function updateAction(win) {
+  if (!updater) return null;
+  const st = updater.state;
+  if (st.status === 'available' && (st.portable || !st.asset)) {
+    shell.openExternal(st.page);
+    return st;
+  }
+  if (st.status === 'available' || (st.status === 'error' && st.stage === 'download')) {
+    updater.download().catch(() => {});
+    return updater.state;
+  }
+  if (st.status === 'ready') {
+    const active = lastActivity.active;
+    const r = await dialog.showMessageBox(win, {
+      type: 'question',
+      title: 'Update KDM',
+      message: `Install KDM ${st.version} now?`,
+      detail: active
+        ? `KDM will close and reopen. ${active} active download${active > 1 ? 's' : ''} will pause and can be resumed afterwards.`
+        : 'KDM will close, install the update and open again.',
+      buttons: ['Restart and update', 'Later'],
+      defaultId: 0,
+      cancelId: 1,
+      noLink: true,
+    });
+    if (r.response !== 0) return st;
+    pendingInstall = st.file;
+    quit();
+    return st;
+  }
+  if (st.status === 'error' || st.status === 'none' || st.status === 'idle') return updater.check();
+  return st;
+}
+
+function runInstaller(file) {
+  try {
+    // NSIS (electron-builder): /S = silent, installs over the current copy; --force-run reopens KDM afterwards
+    spawn(file, ['/S', '--force-run'], { detached: true, stdio: 'ignore', windowsHide: true }).unref();
+  } catch (e) {
+    logError('update', e);
+  }
+}
+
 function projectUrl() {
   try {
     const pkg = JSON.parse(fs.readFileSync(path.join(app.getAppPath(), 'package.json'), 'utf8'));
