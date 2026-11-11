@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'" />
+    <title>Add New Download</title>
+    <link rel="stylesheet" href="styles/base.css" />
+    <link rel="stylesheet" href="styles/dialog.css" />
+  </head>
+  <body class="dialog">
+    <header class="titlebar">
+      <img class="tb-icon" src="assets/icons/app-16.svg" alt="" />
+      <span class="tb-title" id="title">Add New Download</span>
+    </header>
+
+    <!-- Step 1: Add link (580×154) -->
+    <form class="page pane" id="paneAdd" autocomplete="off">
+      <label class="label at" style="left: 24px; top: 24px" for="address" id="addrLabel">Address:</label>
+      <input class="field at" id="address" style="left: 24px; top: 48px; width: 532px" spellcheck="false" placeholder="https://" />
+      <div class="status at" id="addStatus" style="left: 24px; top: 92px"></div>
+      <button type="button" class="btn btn-secondary at" id="addCancel" style="right: 117px; bottom: 24px"><img src="assets/icons/btn-x.svg" alt="" /><span>Cancel</span></button>
+      <button type="submit" class="btn btn-primary at ok" id="addOk" style="right: 24px; bottom: 24px"><span>Ok</span></button>
+    </form>
+
+    <!-- Step 2: Download file info (580×233) -->
+    <form class="page pane" id="paneInfo" autocomplete="off" hidden>
+      <img class="at" id="infoCat" src="assets/categories/other-max.svg" alt="" style="left: 24px; top: 24px; width: 50px; height: 32px" />
+      <input class="field at" id="infoName" style="left: 85px; top: 24px; width: 471px" spellcheck="false" title="File name" />
+      <div class="at size-line" style="left: 24px; top: 80px">
+        <span class="label">Size:</span>
+        <b class="size-val" id="infoSize">…</b>
+      </div>
+      <div class="at size-line right" style="right: 24px; top: 80px">
+        <span class="label">Available:</span>
+        <span class="avail-val" id="infoAvail">…</span>
+      </div>
+      <div class="folder-field at" id="infoFolder" style="left: 24px; top: 107px; width: 532px" title="Change folder">
+        <img src="assets/icons/folder.svg" alt="" />
+        <div class="path" id="infoDir"></div>
+        <div class="browse">Browse...</div>
+      </div>
+      <div class="at warn" id="infoWarn" style="left: 24px; top: 151px" hidden></div>
+      <button type="button" class="btn btn-outline text-only at" id="infoLater" style="left: 24px; bottom: 24px">Download Later</button>
+      <button type="button" class="btn btn-secondary blue at" id="infoWatch" style="right: 154px; bottom: 24px">
+        <img src="assets/icons/btn-play.svg" alt="" class="only-light" /><img src="assets/icons/btn-play-dark.svg" alt="" class="only-dark" /><span>Online Watch</span>
+      </button>
+      <button type="submit" class="btn btn-primary at" id="infoDownload" style="right: 24px; bottom: 24px"><img src="assets/icons/btn-download.svg" alt="" /><span>Download</span></button>
+    </form>
+
+    <script src="common.js"></script>
+    <script src="dialog.js"></script>
+  </body>
+</html>

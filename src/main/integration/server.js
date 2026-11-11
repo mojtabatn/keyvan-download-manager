@@ -1,0 +1,71 @@
+'use strict';
+
+const http = require('http');
+
+const PORT = 17842;
+const EXT_ORIGIN = /^(chrome|moz|edge|safari-web)-extension:\/\//;
+
+/**
+ * Local bridge for the browser extension (127.0.0.1 only).
+ *   GET  /ping       -> { app, version, enabled }
+ *   POST /download   -> { url | urls[], filename?, referrer?, cookies?, userAgent?, size? }
+ * Requests from web pages are refused (they always carry an http(s) Origin),
+ * and the Host header is checked to block DNS-rebinding.
+ */
+function startIntegrationServer({ version, isEnabled, onDownload }) {
+  const server = http.createServer((req, res) => {
+    const origin = req.headers.origin || '';
+    const host = String(req.headers.host || '');
+    if (!/^(127\.0\.0\.1|localhost):\d+$/.test(host) || (origin && !EXT_ORIGIN.test(origin))) {
+      res.writeHead(403);
+      return res.end();
+    }
+    const cors = origin ? { 'Access-Control-Allow-Origin': origin, 'Access-Control-Allow-Headers': 'Content-Type' } : {};
+    const json = (code, body) => {
+      res.writeHead(code, { 'Content-Type': 'application/json', ...cors });
+      res.end(JSON.stringify(body));
+    };
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204, { ...cors, 'Access-Control-Allow-Methods': 'GET, POST' });
+      return res.end();
+    }
+    if (req.method === 'GET' && req.url === '/ping') return json(200, { app: 'download-manager', version, enabled: isEnabled() });
+    if (req.method === 'POST' && req.url === '/download') {
+      if (!/application\/json/.test(req.headers['content-type'] || '')) return json(415, { error: 'json required' });
+      let body = '';
+      req.on('data', (c) => {
+        body += c;
+        if (body.length > 2_000_000) req.destroy();
+      });
+      req.on('end', () => {
+        if (!isEnabled()) return json(503, { error: 'integration disabled' });
+        let p;
+        try {
+          p = JSON.parse(body);
+        } catch {
+          return json(400, { error: 'bad json' });
+        }
+        const valid = (u) => typeof u === 'string' && /^https?:\/\//i.test(u) && u.length < 8192;
+        const urls = Array.isArray(p.urls) ? p.urls.filter(valid).slice(0, 500) : [];
+        if (!valid(p.url) && !urls.length) return json(400, { error: 'bad url' });
+        onDownload({
+          url: valid(p.url) ? p.url : undefined,
+          urls,
+          filename: typeof p.filename === 'string' ? p.filename.slice(0, 260) : '',
+          referrer: typeof p.referrer === 'string' ? p.referrer.slice(0, 4096) : '',
+          cookies: typeof p.cookies === 'string' ? p.cookies.slice(0, 16384) : '',
+          userAgent: typeof p.userAgent === 'string' ? p.userAgent.slice(0, 512) : '',
+          size: Number(p.size) > 0 ? Number(p.size) : -1,
+        });
+        json(200, { ok: true });
+      });
+      return;
+    }
+    json(404, { error: 'not found' });
+  });
+  server.on('error', (e) => console.error('[integration] server error:', e.message));
+  server.listen(PORT, '127.0.0.1');
+  return server;
+}
+
+module.exports = { startIntegrationServer, PORT };

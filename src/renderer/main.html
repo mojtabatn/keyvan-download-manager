@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'" />
+    <title>Download Manager</title>
+    <link rel="stylesheet" href="styles/base.css" />
+    <link rel="stylesheet" href="styles/main.css" />
+  </head>
+  <body class="main">
+    <header class="titlebar">
+      <img class="tb-icon" src="assets/icons/app-16.svg" alt="" />
+      <span class="tb-title">Download Manager</span>
+    </header>
+
+    <div class="page" id="page">
+      <aside class="sidebar">
+        <button class="btn-add" id="addLink" title="Add a new download (Ctrl+N)">
+          <img src="assets/icons/add.svg" alt="" />
+          <span>Add Link</span>
+        </button>
+        <nav class="nav" id="nav">
+          <button class="nav-item active" data-view="all">
+            <img src="assets/icons/nav-all.svg" alt="" class="only-light" /><img src="assets/icons/nav-all.svg" alt="" class="only-dark" />
+            <span>All Downloads</span><b class="badge" id="badgeAll"></b>
+          </button>
+          <button class="nav-item" data-view="completed">
+            <img src="assets/icons/nav-completed.svg" alt="" class="only-light" /><img src="assets/icons/nav-completed-dark.svg" alt="" class="only-dark" />
+            <span>Completed</span>
+          </button>
+          <button class="nav-item" data-view="scheduled">
+            <img src="assets/icons/nav-scheduled.svg" alt="" class="only-light" /><img src="assets/icons/nav-scheduled-dark.svg" alt="" class="only-dark" />
+            <span>Scheduled</span><b class="badge" id="badgeQueue"></b>
+          </button>
+          <button class="nav-item" data-view="settings">
+            <img src="assets/icons/nav-settings.svg" alt="" class="only-light" /><img src="assets/icons/nav-settings-dark.svg" alt="" class="only-dark" />
+            <span>Settings</span>
+          </button>
+        </nav>
+        <div class="side-foot">
+          <div class="total-speed" id="totalSpeed" hidden></div>
+          <div class="version" id="version">Version 1.2.0</div>
+        </div>
+      </aside>
+
+      <section class="content">
+        <div class="toolbar">
+          <div class="search" id="search">
+            <button class="search-icon" id="searchBtn" title="Search (Ctrl+F)"><img src="assets/icons/search.svg" alt="" /></button>
+            <input id="searchInput" type="text" placeholder="Search..." spellcheck="false" />
+            <button class="search-clear" id="searchClear" title="Clear"><img src="assets/icons/search-clear.svg" alt="" /></button>
+          </div>
+          <div class="conn" id="conn">
+            <button class="conn-btn" id="connBtn">
+              <span class="shield" id="connShield"></span>
+              <span class="conn-label" id="connLabel">Normal Connection</span>
+              <span class="chev"><img src="assets/icons/chevron-down.svg" alt="" class="only-light" /><img src="assets/icons/chevron-down-dark.svg" alt="" class="only-dark" /></span>
+            </button>
+            <div class="conn-menu" id="connMenu" hidden>
+              <button class="conn-opt" data-mode="normal">
+                <img src="assets/icons/shield-off.svg" alt="" class="only-light" /><img src="assets/icons/shield-off-dark.svg" alt="" class="only-dark" />
+                <span>Normal Connection</span>
+              </button>
+              <button class="conn-opt" data-mode="secure">
+                <img src="assets/icons/shield-on.svg" alt="" />
+                <span>Secure Connection</span>
+              </button>
+              <div class="conn-foot">
+                <span id="proxyAddr">SOCKS5 127.0.0.1:10808</span>
+                <button id="proxyTest">Test</button>
+                <button id="proxyEdit">Edit</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card" id="card">
+          <!-- All / Completed -->
+          <div class="view" id="view-list">
+            <div class="list" id="list"></div>
+            <div class="empty" id="empty" hidden>
+              <img src="assets/icons/app-30.svg" alt="" />
+              <div class="empty-title" id="emptyTitle">No downloads yet</div>
+              <div class="empty-sub" id="emptySub">Click “Add Link”, paste a link (Ctrl+V) or drop one here.</div>
+            </div>
+          </div>
+
+          <!-- Scheduled (queue + scheduler) -->
+          <div class="view" id="view-scheduled" hidden>
+            <div class="queue-panel">
+              <div class="qp-row">
+                <button class="btn btn-primary qp-start" id="queueStart"><img src="assets/icons/btn-play.svg" alt="" class="white" /><span>Start queue</span></button>
+                <button class="btn btn-outline qp-stop" id="queueStop" hidden><img src="assets/icons/btn-pause.svg" alt="" /><span>Stop queue</span></button>
+                <div class="qp-status" id="queueStatus">Queue is idle</div>
+              </div>
+              <div class="qp-grid">
+                <label class="qp-cell"><span class="switch"><input type="checkbox" id="schEnabled" /><span></span></span><span>Start at</span><input class="field time" type="time" id="schStart" /></label>
+                <label class="qp-cell"><span class="switch"><input type="checkbox" id="schStopEnabled" /><span></span></span><span>Stop at</span><input class="field time" type="time" id="schStop" /></label>
+                <div class="qp-cell days" id="schDays"></div>
+                <label class="qp-cell"><span>At a time</span><select class="field small" id="schMax"></select></label>
+                <label class="qp-cell"><span>When finished</span>
+                  <select class="field" id="schAfter">
+                    <option value="none">Do nothing</option>
+                    <option value="exit">Exit app</option>
+                    <option value="sleep">Sleep</option>
+                    <option value="hibernate">Hibernate</option>
+                    <option value="shutdown">Shut down</option>
+                  </select>
+                </label>
+              </div>
+            </div>
+            <div class="list" id="qlist"></div>
+            <div class="empty small" id="qempty" hidden>
+              <div class="empty-title">The queue is empty</div>
+              <div class="empty-sub">Choose “Download Later” when adding a link, or right-click a download → Add to queue.</div>
+            </div>
+          </div>
+
+          <!-- Settings -->
+          <div class="view settings" id="view-settings" hidden></div>
+
+          <div class="power-banner" id="powerBanner" hidden>
+            <span id="powerText"></span>
+            <button class="btn btn-secondary text-only" id="powerCancel">Cancel</button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="drop-hint" id="dropHint" hidden><div>Drop link to download</div></div>
+
+    <script src="common.js"></script>
+    <script src="views/settings.js"></script>
+    <script src="main.js"></script>
+  </body>
+</html>

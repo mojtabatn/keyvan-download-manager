@@ -1,0 +1,170 @@
+'use strict';
+/* Settings view rendered inside the main card. */
+window.SettingsView = (function () {
+  const { el, icon } = DM;
+  let root;
+  let s;
+  const bind = []; // [{ key, apply(settings) }]
+
+  const save = (patch) => api.invoke('settings:set', patch);
+
+  function group(title, id, ...rows) {
+    return el('div', { class: 'set-group', id: id ? `set-${id}` : null }, el('div', { class: 'set-title', text: title }), ...rows);
+  }
+
+  function row(label, hint, control) {
+    return el('div', { class: 'set-row' }, el('div', { class: 'set-text' }, el('div', { class: 'set-label', text: label }), hint ? el('div', { class: 'set-hint', text: hint }) : null), control);
+  }
+
+  function toggle(get, set) {
+    const input = el('input', { type: 'checkbox' });
+    input.addEventListener('change', () => set(input.checked));
+    bind.push({ apply: (x) => (input.checked = !!get(x)) });
+    return el('label', { class: 'switch' }, input, el('span'));
+  }
+
+  function select(options, get, set, cls = '') {
+    const sel = el('select', { class: `field ${cls}` }, ...options.map(([v, t]) => el('option', { value: String(v), text: t })));
+    sel.addEventListener('change', () => set(sel.value));
+    bind.push({ apply: (x) => (sel.value = String(get(x))) });
+    return sel;
+  }
+
+  function segmented(options, get, set) {
+    const wrap = el('div', { class: 'seg' });
+    const btns = options.map(([v, t]) => {
+      const b = el('button', { text: t, onclick: () => set(v) });
+      b.dataset.v = v;
+      return b;
+    });
+    wrap.append(...btns);
+    bind.push({ apply: (x) => btns.forEach((b) => b.classList.toggle('on', b.dataset.v === get(x))) });
+    return wrap;
+  }
+
+  function folderField() {
+    const path = el('div', { class: 'path' });
+    const f = el('div', { class: 'folder-field', title: 'Choose folder' }, icon('folder'), path, el('div', { class: 'browse', text: 'Browse...' }));
+    f.addEventListener('click', async () => {
+      const dir = await api.invoke('dialog:pickFolder', s.downloadDir);
+      if (dir) save({ downloadDir: dir });
+    });
+    bind.push({ apply: (x) => ((path.textContent = x.downloadDir), (f.title = x.downloadDir)) });
+    return f;
+  }
+
+  function proxyEditor() {
+    const type = el('select', { class: 'field' }, el('option', { value: 'socks5', text: 'SOCKS5' }), el('option', { value: 'http', text: 'HTTP' }));
+    const host = el('input', { class: 'field host', placeholder: '127.0.0.1', spellcheck: 'false' });
+    const port = el('input', { class: 'field port', type: 'number', min: '1', max: '65535' });
+    const result = el('span', { class: 'test-result' });
+    const test = el('button', { class: 'btn btn-outline blue text-only', text: 'Test', style: 'height:30px;font-size:13px;padding:4px 12px' });
+    const commit = () => save({ proxy: { type: type.value, host: host.value.trim() || '127.0.0.1', port: Number(port.value) || 10808 } });
+    type.addEventListener('change', () => {
+      // v2rayN defaults: SOCKS 10808, HTTP 10809
+      if (type.value === 'http' && port.value === '10808') port.value = '10809';
+      if (type.value === 'socks5' && port.value === '10809') port.value = '10808';
+      commit();
+    });
+    host.addEventListener('change', commit);
+    port.addEventListener('change', commit);
+    test.addEventListener('click', async () => {
+      result.className = 'test-result';
+      result.textContent = 'Testing…';
+      const r = await api.invoke('connection:test');
+      result.className = `test-result ${r.ok ? 'ok' : 'bad'}`;
+      result.textContent = r.ok ? `Connected · ${r.ms} ms` : r.error || 'Failed';
+    });
+    bind.push({
+      apply: (x) => {
+        type.value = x.proxy.type;
+        if (document.activeElement !== host) host.value = x.proxy.host;
+        if (document.activeElement !== port) port.value = String(x.proxy.port);
+      },
+    });
+    return el('div', {}, el('div', { class: 'proxy-grid' }, type, host, port, test), el('div', { style: 'margin-top:6px;min-height:16px' }, result));
+  }
+
+  function mount(container, settings, info) {
+    root = container;
+    s = settings;
+    const KB = [
+      [0, 'Unlimited'],
+      [128, '128 KB/s'],
+      [256, '256 KB/s'],
+      [512, '512 KB/s'],
+      [1024, '1 MB/s'],
+      [2048, '2 MB/s'],
+      [5120, '5 MB/s'],
+      [10240, '10 MB/s'],
+    ];
+    root.append(
+      group(
+        'General',
+        'general',
+        row('Appearance', null, segmented([['system', 'System'], ['light', 'Light'], ['dark', 'Dark']], (x) => x.theme, (v) => save({ theme: v }))),
+        row('Keep running in the tray', 'Closing the window keeps downloads going.', toggle((x) => x.closeToTray, (v) => save({ closeToTray: v }))),
+        row('Launch at Windows startup', 'Starts minimized to the tray.', toggle((x) => x.launchAtStartup, (v) => save({ launchAtStartup: v }))),
+        row('Notifications', 'Show a notification when a download finishes or fails.', toggle((x) => x.notifications, (v) => save({ notifications: v })))
+      ),
+      group(
+        'Downloads',
+        'downloads',
+        el('div', { class: 'set-row' }, el('div', { class: 'set-label', text: 'Save to', style: 'width:64px' }), folderField()),
+        row('Sort into category folders', 'Video, Music, Compressed, Documents, Programs, General', toggle((x) => x.categorize, (v) => save({ categorize: v }))),
+        row(
+          'Connections per download',
+          'More connections = faster on most servers (IDM uses 8).',
+          select([1, 2, 4, 6, 8, 12, 16, 24, 32].map((n) => [n, String(n)]), (x) => x.connections, (v) => save({ connections: Number(v) }), 'small')
+        ),
+        row('Speed limit', 'Applies to all downloads together.', select(KB, (x) => (KB.some(([k]) => k === x.speedLimit) ? x.speedLimit : 0), (v) => save({ speedLimit: Number(v) }))),
+        row('Show progress window', 'Open a small window for each download (like IDM).', toggle((x) => x.showProgressWindow, (v) => save({ showProgressWindow: v }))),
+        row('Show “download complete” window', null, toggle((x) => x.showCompleteWindow, (v) => save({ showCompleteWindow: v }))),
+        row('Watch clipboard for links', 'Copying a file link opens the Add Link window.', toggle((x) => x.clipboardWatch, (v) => save({ clipboardWatch: v }))),
+        row('Prevent sleep while downloading', null, toggle((x) => x.preventSleep, (v) => save({ preventSleep: v })))
+      ),
+      group(
+        'Secure connection',
+        'proxy',
+        el('div', { class: 'set-hint', style: 'margin:-2px 0 10px;font-size:12px', text: 'When “Secure Connection” is on, downloads go through your local proxy (v2rayN / Xray / Clash). v2rayN defaults: SOCKS5 127.0.0.1:10808 or HTTP 10809.' }),
+        proxyEditor()
+      ),
+      group(
+        'Browser integration',
+        'browser',
+        row('Catch downloads from the browser', 'Chrome / Edge / Brave downloads are sent to Download Manager.', toggle((x) => x.browserIntegration, (v) => save({ browserIntegration: v }))),
+        el(
+          'ol',
+          { class: 'steps' },
+          el('li', {}, 'Open ', el('code', { text: 'edge://extensions' }), ' or ', el('code', { text: 'chrome://extensions' })),
+          el('li', { text: 'Turn on “Developer mode”, click “Load unpacked”' }),
+          el('li', { text: 'Select the extension folder below' })
+        ),
+        el('button', { class: 'btn btn-outline blue text-only', text: 'Open extension folder', style: 'height:32px;font-size:13px;margin:4px 0 10px', onclick: () => api.invoke('extension:openFolder') })
+      ),
+      group(
+        'About',
+        'about',
+        el(
+          'div',
+          { class: 'about', style: 'padding:4px 0 8px' },
+          el('img', { src: 'assets/icons/app-30.svg', alt: '' }),
+          el('div', {}, el('div', { class: 'set-label', text: `Download Manager ${info.version}` }), el('div', { class: 'set-hint', text: 'Minimal, multi-connection download manager.' }))
+        )
+      )
+    );
+    update(settings);
+  }
+
+  function update(settings) {
+    s = settings;
+    for (const b of bind) b.apply(settings);
+  }
+
+  function focus(section) {
+    const g = root && root.querySelector(`#set-${section}`);
+    if (g) g.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  return { mount, update, focus };
+})();

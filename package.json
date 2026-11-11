@@ -1,0 +1,83 @@
+{
+  "name": "minimal-download-manager",
+  "productName": "Download Manager",
+  "version": "1.2.0",
+  "description": "A minimal, fast, multi-connection download manager for Windows",
+  "main": "src/main/main.js",
+  "author": "Mojtaba",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test --test-concurrency=1 test/engine.test.js",
+    "icons": "node scripts/make-icons.js",
+    "ui-check": "node scripts/ui-check.js shots light",
+    "dist:win": "electron-builder --win nsis portable --x64 --publish never",
+    "pack:win": "electron-builder --win dir --x64"
+  },
+  "dependencies": {
+    "http-proxy-agent": "^7.0.2",
+    "https-proxy-agent": "^7.0.6",
+    "socks-proxy-agent": "^8.0.5"
+  },
+  "devDependencies": {
+    "@fontsource-variable/plus-jakarta-sans": "^5.3.0",
+    "electron": "45.2.3",
+    "electron-builder": "^26.0.12",
+    "png-to-ico": "^3.0.2",
+    "resedit": "^3.1.0"
+  },
+  "build": {
+    "appId": "com.mojtaba.downloadmanager",
+    "productName": "Download Manager",
+    "copyright": "Copyright \u00a9 2026 Mojtaba",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "extension",
+        "to": "extension"
+      }
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "executableName": "DownloadManager"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Download Manager",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "artifactName": "DownloadManager-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "DownloadManager-Portable-${version}.${ext}"
+    },
+    "publish": null
+  }
+}
