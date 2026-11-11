@@ -11,7 +11,7 @@
     selected: null,
     settings: null,
     queueRunning: false,
-    listView: 'cards', // 'cards' (large icons) | 'compact' (list without icons)
+    listView: 'cards', // 'cards' (large icons) | 'compact' (list with small icons)
   };
   const rows = new Map(); // id -> { row, divider, parts }
 
