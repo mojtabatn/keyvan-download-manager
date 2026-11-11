@@ -5,6 +5,12 @@
    "Glass" themes use translucent surfaces over a gradient background.
    ------------------------------------------------------------------ */
 
+/* Day and Night use the logo's violet (#CE9FFC -> #7367F0) for their main colour */
+:root[data-theme='day'], .theme-preview[data-t='day'],
+:root[data-theme='night'], .theme-preview[data-t='night'] {
+  --logo-btn: linear-gradient(180deg, #a48bf8 0%, #7367f0 100%);
+}
+
 /* Shared defaults for the gradient "glass" dark themes */
 :root[data-theme='ocean'], .theme-preview[data-t='ocean'],
 :root[data-theme='night'], .theme-preview[data-t='night'],
@@ -57,7 +63,7 @@
 
 /* Day — airy light blue */
 :root[data-theme='day'], .theme-preview[data-t='day'] {
-  --primary-btn: #3b82f6;
+  --primary-btn: var(--logo-btn);
   --bg: #eef4ff;
   --bg-image: linear-gradient(160deg, #f6f9ff 0%, #e4eeff 100%);
   --title-bg: #f6f9ff;
@@ -75,31 +81,31 @@
   --text-2: #4a5b7a;
   --text-3: #9aaacb;
   --nav-text: #4a5b7a;
-  --nav-active: #2563eb;
-  --blue: #3b82f6;
-  --link: #3b82f6;
-  --blue-btn: #3b82f6;
-  --btn-ring: #60a5fa;
+  --nav-active: #5a47df;
+  --blue: #7367f0;
+  --link: #6a5be8;
+  --blue-btn: var(--logo-btn);
+  --btn-ring: #8b7cf3;
   --btn2-bg: #f2f6fd;
   --btn2-text: #4a5b7a;
-  --select: rgba(59, 130, 246, 0.09);
-  --accent-filter: hue-rotate(8deg);
+  --select: rgba(115, 103, 240, 0.09);
+  --accent-filter: hue-rotate(34deg);
 }
 
 /* Night — slate navy */
 :root[data-theme='night'], .theme-preview[data-t='night'] {
-  --primary-btn: #5b7cfa;
+  --primary-btn: var(--logo-btn);
   --bg: #161b2b;
   --bg-image: linear-gradient(160deg, #161b2b 0%, #1e2538 60%, #283149 100%);
   --title-bg: #161b2b;
   --dialog: #1d2335;
   --surface: rgba(255, 255, 255, 0.05);
-  --blue: #8aa4ff;
-  --link: #8aa4ff;
-  --blue-btn: #5b7cfa;
-  --btn-ring: #8aa4ff;
-  --select: rgba(138, 164, 255, 0.14);
-  --accent-filter: hue-rotate(22deg) brightness(1.15);
+  --blue: #a895fb;
+  --link: #a895fb;
+  --blue-btn: var(--logo-btn);
+  --btn-ring: #8b7cf3;
+  --select: rgba(168, 149, 251, 0.14);
+  --accent-filter: hue-rotate(40deg) brightness(1.2);
 }
 
 /* Neon — violet to cyan, glowing accents */
