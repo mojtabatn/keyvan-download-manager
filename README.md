@@ -1,75 +1,163 @@
-# Keyvan Download Manager (KDM)
+<div align="center">
 
-A minimal, fast download manager for Windows, built from the Figma design
-(“Download Manager”, light + dark mode), with the useful parts of IDM added.
+<img src="src/renderer/assets/icons/logo.svg" width="96" alt="KDM logo" />
+
+# Keyvan Download Manager
+
+**A minimal, fast download manager for Windows, with a built-in video downloader.**
+
+Multi-connection downloads · Video grabber for YouTube, X and 1000+ sites · Queue and scheduler · 10 themes
+
+![Version](https://img.shields.io/badge/version-0.1.0-1e83f1)
+![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078d4)
+![License](https://img.shields.io/badge/license-MIT-12be42)
+
+<img src="docs/screenshots/main-light.png" width="760" alt="KDM main window" />
+
+</div>
+
+---
+
+## Why KDM?
+
+- **Clean and minimal.** One window, one list. No ads, no banners, no menus full of options you never use.
+- **Fast.** Each file is split into up to 32 parts that download at the same time.
+- **Videos too.** Paste a YouTube or X link, pick a quality, done.
+- **Free and open source** under the MIT license.
+
+---
 
 ## Features
 
-**From the design notes**
-- Multiple connections per download (1–32, default 8)
-- Scheduler: start / stop the queue at set times on chosen days
-- Run something when the queue finishes: shut down, sleep, hibernate, or exit (60 s countdown you can cancel)
-- “How many downloads at a time” for the queue
+### ⚡ Multi-part downloads (up to 32 connections)
 
-**Video downloads (IDM-style video grabber)**
-- Download videos from YouTube, X, Instagram, TikTok, Vimeo, Aparat and 1000+ other sites: paste the page link into
-  *Add Link*, or click **Download video** when you hover a video in the browser
-- Pick the quality (4K, 1080p, 720p…) or **Audio only (MP3)**; HD video and audio are merged automatically
-- The browser extension also detects streaming video (HLS `.m3u8`, DASH `.mpd`, MP4/WebM) on any page; the toolbar
-  badge shows how many it found
-- Powered by [yt-dlp](https://github.com/yt-dlp/yt-dlp) and [ffmpeg](https://ffmpeg.org), downloaded on first use
-  (about 54 MB) and updatable from Settings. DRM-protected services (Netflix, Spotify…) are not supported.
+Each file is split into parts that download in parallel. When one connection finishes early, it takes over half of the
+biggest remaining part, so all connections stay busy until the end (*dynamic segmentation*, as in IDM).
+**Details** shows a live map of every connection.
 
-**Many files at once**
-- Paste or drop several links, use *Download all links on this page* in the browser, or type a pattern like
-  `https://site.com/movie.part[01-12].rar`; a checklist lets you pick which ones to download
+<img src="docs/screenshots/progress-details.png" width="520" alt="Progress window with the per-connection map" />
 
-**IDM-style extras**
-- Dynamic segmentation: a finished connection takes over half of the largest remaining part
-- “Start positions and progress by connections” map and a per-connection list (Details)
-- Resume after pause, crash, or restart; automatic retries with backoff
-- **Refresh link**: swap an expired link for a fresh one without losing what was already downloaded
-- Browser integration (Chrome / Edge / Brave extension), so browser downloads go to the app
-- Clipboard monitoring: copying a file link opens “Add Link”
-- Automatic categories and folders (Video, Music, Compressed, Documents, Programs, General)
-- Global and per-download speed limits
-- “Online Watch” to stream video or audio before downloading (falls back to VLC / PotPlayer)
-- Tray icon, progress on the taskbar button, notifications, and the system kept awake while downloading
-- 10 themes: Light (default) and Dark from the design, plus Day, Night, Paper, Mint, Ocean, Neon, Jungle and Retro 95
-- Paste several links at once or drag and drop links onto the window; copy a SHA-256 checksum
+- **Resume** after a pause, a crash, a restart or a lost connection
+- Automatic retries with backoff
+- Falls back to a single connection when a server doesn't support multi-part downloads
+- **Refresh link**: replace an expired link with a fresh one and keep what was already downloaded
+- Speed limit per download, or for all downloads
+
+### 🎬 Video downloader (YouTube, X, Instagram, TikTok, Vimeo, Aparat and 1000+ sites)
+
+Paste the page link into **Add Link**. KDM finds the video and lists the available qualities with their sizes.
+Choose 4K, 1080p, 720p… or **Audio only (MP3)**. KDM merges HD video and audio into one file automatically.
+
+<img src="docs/screenshots/video-dialog.png" width="520" alt="Choosing the video quality" />
+
+The **Video downloads** section of Settings sets the default quality, the browser button and the download-tool updates.
+
+> Powered by [yt-dlp](https://github.com/yt-dlp/yt-dlp) and [ffmpeg](https://ffmpeg.org), which KDM downloads the first
+> time you use video (about 54 MB). DRM-protected services such as Netflix or Spotify are not supported.
+
+### 🌐 Browser integration (Chrome, Edge, Brave)
+
+- Downloads you start in the browser go straight to KDM
+- A **Download video** button appears when you hover over a video on any page
+- The toolbar popup lists every video stream found on the page (HLS `.m3u8`, DASH `.mpd`, MP4, WebM)
+- **Download all links on this page**, plus *Download with KDM* when you right-click a link
+
+<p>
+<img src="docs/screenshots/browser-button.png" width="520" alt="Download video button over a video" />
+&nbsp;
+<img src="docs/screenshots/browser-popup.png" width="220" alt="Extension popup" />
+</p>
+
+### 📦 Many files at once
+
+Paste several links, drag them onto the window, or type a pattern such as
+`https://site.com/Silo.S01.part[01-06].rar`. KDM expands it into a checklist so you can pick the files you want and
+download them now or add them to the queue.
+
+<img src="docs/screenshots/batch-dialog.png" width="520" alt="Batch download checklist" />
+
+### 🗓️ Download queue and scheduler
+
+- Put downloads in a queue and choose how many run **at a time**
+- **Start** and **stop** the queue at set times on chosen days, for example overnight when internet is cheaper
+- **When finished**: shut down, sleep, hibernate or close KDM, with a 60-second countdown you can cancel
+
+<img src="docs/screenshots/queue.png" width="760" alt="Queue and scheduler" />
+
+### 🎨 10 themes
+
+Light (default) and Dark, plus **Day, Night, Paper, Mint, Ocean, Neon, Jungle** and **Retro 95**. Each theme also
+colors the window title bar to match.
+
+<img src="docs/screenshots/themes.png" alt="All ten themes" />
+
+<img src="docs/screenshots/settings.png" width="760" alt="Theme picker in Settings" />
+
+### 🧭 Small things that make it nice
+
+- **Card** and **compact list** views, search, and a toolbar to resume, pause, stop or delete everything at once
+
+  <img src="docs/screenshots/main-compact.png" width="760" alt="Compact list view" />
+
+- Before downloading, KDM shows the file name, size and free disk space
+
+  <img src="docs/screenshots/dialog-info.png" width="520" alt="File info before download" />
+
+- **Online Watch**: stream a video or song before it finishes downloading (or open it in VLC or PotPlayer)
+- Files are sorted into folders by type: Video, Music, Compressed, Documents, Programs
+- Copying a download link in any app opens *Add Link* (clipboard monitoring)
+- Canceled downloads stay in the list so you can restart them later
+- Tray icon, progress on the taskbar button, notifications, and the PC stays awake while downloading
+- SHA-256 checksum of finished files
+- Keyboard shortcuts: `Ctrl+N` add link · `Ctrl+F` search · `Ctrl+V` paste links · `Space` pause or resume ·
+  `Enter` open · `Delete` cancel or remove
+
+<div align="center">
+<img src="docs/screenshots/main-dark.png" width="760" alt="KDM in the Dark theme" />
+</div>
+
+---
 
 ## Install
 
-1. Run `KDM-Setup-0.1.0.exe` (or use `KDM-Portable-0.1.0.exe`, which needs no installation).
-2. The build isn't code-signed, so Windows SmartScreen may warn you. Click **More info → Run anyway**.
+> Installers will be on the [Releases](https://github.com/mojtabatn/keyvan-download-manager/releases) page.
+
+1. Download `KDM-Setup-0.1.0.exe`, or `KDM-Portable-0.1.0.exe` if you don't want to install anything.
+2. The app isn't code-signed yet, so Windows SmartScreen may warn you. Click **More info → Run anyway**.
 
 ### Browser extension
-1. Open `edge://extensions` or `chrome://extensions` and turn on **Developer mode**.
-2. Click **Load unpacked** and pick the extension folder (Settings → Browser integration → *Open extension folder*;
-   after installing it's in `…\Keyvan Download Manager\resources\extension`).
 
-## Keyboard
-`Ctrl+N` add link · `Ctrl+F` search · `Ctrl+V` paste link(s) · `Space` pause or resume · `Enter` open · `Delete` cancel or remove
+1. Open `chrome://extensions` (or `edge://extensions`) and turn on **Developer mode**.
+2. Click **Load unpacked** and select the extension folder. To find it, open **Settings → Browser integration → Open
+   extension folder** in KDM.
 
-## Develop
+---
+
+## Build from source
+
+You need [Node.js](https://nodejs.org) 20 or newer.
 
 ```bash
 git clone https://github.com/mojtabatn/keyvan-download-manager.git
 cd keyvan-download-manager
 npm install
 npm start          # run the app
-npm test           # download-engine tests (against a local HTTP test server)
-npm run dist:win   # build the Windows installer + portable exe into dist/ (Linux needs wine + wine32)
+npm test           # engine and video-pipeline tests (local test server, no internet needed)
+npm run dist:win   # build the installer + portable exe into dist/ (on Linux this needs wine)
 ```
 
-Layout:
-- `src/main/engine/`: download engine (segments, resume, queue, scheduler)
-- `src/main/`: Electron main process (windows, tray, IPC, browser bridge on `127.0.0.1:17842`, power actions)
-- `src/renderer/`: UI (HTML/CSS/JS); icons are exported straight from the Figma file
-- `extension/`: Manifest V3 browser extension
-- `scripts/ui-check.js`, `scripts/ext-check.js`: end-to-end checks that drive the real app (and a real browser)
+Project layout:
 
-Font: the whole UI uses **Manrope** (bundled, SIL Open Font License), so it looks the same on every PC.
+| Folder | What's inside |
+| --- | --- |
+| `src/main/engine/` | Download engine: segments, resume, queue, scheduler |
+| `src/main/media/` | Video downloads (yt-dlp and ffmpeg) |
+| `src/main/` | Electron main process: windows, tray, browser bridge on `127.0.0.1:17842`, power actions |
+| `src/renderer/` | User interface (HTML, CSS, JS) |
+| `extension/` | Manifest V3 browser extension |
+| `scripts/` | End-to-end checks that drive the real app and browser; `readme-shots.js` makes these screenshots |
+
+The UI uses the **Manrope** font (bundled, SIL Open Font License), so it looks the same on every PC.
 
 ## License
 
