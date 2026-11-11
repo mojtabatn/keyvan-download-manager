@@ -47,7 +47,14 @@
 .nav-item span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .nav-item:hover:not(.active) { background: rgba(0, 0, 0, 0.03); }
 :root[data-base='dark'] .nav-item:hover:not(.active) { background: rgba(255, 255, 255, 0.04); }
-.nav-item.active img { filter: var(--accent-filter); }
+/* Sidebar icons: two-tone, grey when idle, accent when selected */
+.nav-ic { width: 16px; height: 16px; flex: none; }
+.nav-ic .ic-bg { fill: var(--nav-ic-bg); transition: fill 0.15s; }
+.nav-ic .ic-fg { fill: var(--nav-ic-fg); transition: fill 0.15s; }
+.nav-item.active .nav-ic .ic-bg { fill: var(--nav-on-bg); }
+.nav-item.active .nav-ic .ic-fg { fill: url(#navOn); }
+#navOn .g-a { stop-color: var(--nav-on-a); }
+#navOn .g-b { stop-color: var(--nav-on-b); }
 .nav-item.active {
   background: var(--surface);
   border-color: var(--stroke);

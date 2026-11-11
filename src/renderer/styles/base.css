@@ -57,6 +57,12 @@
   --btn3d: 0 0 0 1px var(--btn-ring), 0 0 0 3px rgba(0, 0, 0, 0.05), 0 2px 8px rgba(0, 0, 0, 0.25), inset 0 10px 15px rgba(255, 255, 255, 0.2);
   --bg-image: none;
   --accent-filter: none;
+  /* sidebar icons (Figma): idle grey, selected blue */
+  --nav-ic-bg: #d9d9d9;
+  --nav-ic-fg: #717171;
+  --nav-on-bg: #a4daff;
+  --nav-on-a: #0466c8;
+  --nav-on-b: #158aff;
   --scroll: rgba(0, 0, 0, 0.16);
   --font: 'Manrope', 'Segoe UI Variable Text', 'Segoe UI', Tahoma, system-ui, sans-serif;
   --font-ui: var(--font);
@@ -120,6 +126,13 @@ input, select, textarea { font: inherit; color: inherit; }
 .only-dark { display: none; }
 :root[data-base='dark'] .only-dark { display: block; }
 :root[data-base='dark'] .only-light { display: none; }
+:root[data-base='dark'] { --nav-ic-bg: #8a8a8a; --nav-ic-fg: #d4d4d4; }
+/* other themes: the selected icon follows the theme's accent colour */
+:root[data-theme]:not([data-theme='light']):not([data-theme='dark']) {
+  --nav-on-bg: color-mix(in srgb, var(--blue) 42%, #fff);
+  --nav-on-a: color-mix(in srgb, var(--blue) 72%, #000);
+  --nav-on-b: var(--blue);
+}
 
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb { background: var(--scroll); border-radius: 10px; border: 3px solid transparent; background-clip: content-box; }
