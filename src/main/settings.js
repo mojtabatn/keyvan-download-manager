@@ -3,9 +3,11 @@
 const fs = require('fs');
 const path = require('path');
 
+const THEME_IDS = ['system', 'light', 'dark', 'day', 'night', 'paper', 'mint', 'ocean', 'neon', 'jungle', 'retro'];
+
 function defaults(downloadsDir) {
   return {
-    theme: 'system', // 'system' | 'light' | 'dark'
+    theme: 'system', // 'system' or a theme id from windows.js THEMES
     downloadDir: downloadsDir,
     categorize: true, // sort into Video / Music / Compressed / Documents / Programs / General
     connections: 8, // connections per download
@@ -95,7 +97,7 @@ function sanitizePatch(p) {
   if ('maxConcurrent' in out) out.maxConcurrent = clamp(out.maxConcurrent, 1, 20, 3);
   if ('speedLimit' in out) out.speedLimit = clamp(out.speedLimit, 0, 10_000_000, 0);
   if ('maxRetries' in out) out.maxRetries = clamp(out.maxRetries, 0, 100, 10);
-  if ('theme' in out && !['system', 'light', 'dark'].includes(out.theme)) delete out.theme;
+  if ('theme' in out && !THEME_IDS.includes(out.theme)) delete out.theme;
   if ('connectionMode' in out && !['normal', 'secure'].includes(out.connectionMode)) delete out.connectionMode;
   if (out.proxy) {
     out.proxy = { ...out.proxy };

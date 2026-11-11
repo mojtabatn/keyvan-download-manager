@@ -30,16 +30,40 @@ window.SettingsView = (function () {
     return sel;
   }
 
-  function segmented(options, get, set) {
-    const wrap = el('div', { class: 'seg' });
-    const btns = options.map(([v, t]) => {
-      const b = el('button', { text: t, onclick: () => set(v) });
-      b.dataset.v = v;
-      return b;
+  const THEMES = [
+    ['system', 'System'],
+    ['light', 'Light'],
+    ['dark', 'Dark'],
+    ['day', 'Day'],
+    ['night', 'Night'],
+    ['paper', 'Paper'],
+    ['mint', 'Mint'],
+    ['ocean', 'Ocean'],
+    ['neon', 'Neon'],
+    ['jungle', 'Jungle'],
+    ['retro', 'Retro 95'],
+  ];
+
+  /** A tiny drawing of the main window, coloured by the theme's own tokens. */
+  function miniPreview(t) {
+    return el(
+      'div',
+      { class: 'theme-preview', 'data-t': t },
+      el('div', { class: 'tp-title' }),
+      el('div', { class: 'tp-side' }, el('i', { class: 'tp-add' }), el('i', { class: 'tp-nav on' }), el('i', { class: 'tp-nav' }), el('i', { class: 'tp-nav' })),
+      el('div', { class: 'tp-card' }, el('i', { class: 'tp-line' }), el('i', { class: 'tp-bar' }, el('b')), el('i', { class: 'tp-line short' }), el('i', { class: 'tp-bar' }, el('b', { class: 'p' })))
+    );
+  }
+
+  function themePicker() {
+    const cards = THEMES.map(([id, name]) => {
+      const preview = id === 'system' ? el('div', { class: 'theme-split', title: 'Follows Windows light / dark mode' }, miniPreview('light'), miniPreview('dark')) : miniPreview(id);
+      const card = el('button', { class: 'theme-card', title: id === 'system' ? 'Follow Windows (light / dark)' : `${name} theme`, onclick: () => save({ theme: id }) }, preview, el('span', { text: name }));
+      card.dataset.v = id;
+      return card;
     });
-    wrap.append(...btns);
-    bind.push({ apply: (x) => btns.forEach((b) => b.classList.toggle('on', b.dataset.v === get(x))) });
-    return wrap;
+    bind.push({ apply: (x) => cards.forEach((c) => c.classList.toggle('on', c.dataset.v === x.theme)) });
+    return el('div', { class: 'theme-grid' }, ...cards);
   }
 
   function folderField() {
@@ -99,10 +123,10 @@ window.SettingsView = (function () {
       [10240, '10 MB/s'],
     ];
     root.append(
+      group('Theme', 'theme', themePicker()),
       group(
         'General',
         'general',
-        row('Appearance', null, segmented([['system', 'System'], ['light', 'Light'], ['dark', 'Dark']], (x) => x.theme, (v) => save({ theme: v }))),
         row('Keep running in the tray', 'Closing the window keeps downloads going.', toggle((x) => x.closeToTray, (v) => save({ closeToTray: v }))),
         row('Launch at Windows startup', 'Starts minimized to the tray.', toggle((x) => x.launchAtStartup, (v) => save({ launchAtStartup: v }))),
         row('Notifications', 'Show a notification when a download finishes or fails.', toggle((x) => x.notifications, (v) => save({ notifications: v })))

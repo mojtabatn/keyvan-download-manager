@@ -26,7 +26,7 @@ const {
 const { Settings } = require('./settings');
 const { Manager } = require('./engine/manager');
 const { testConnection } = require('./engine/http');
-const { Windows, resolveTheme } = require('./windows');
+const { Windows, resolveTheme, nativeThemeSource } = require('./windows');
 const { startIntegrationServer } = require('./integration/server');
 const { watchClipboard } = require('./integration/clipboard');
 const { PowerActions } = require('./power');
@@ -83,7 +83,7 @@ const proxy = () => {
 app.whenReady().then(() => {
   const userData = app.getPath('userData');
   settings = new Settings(path.join(userData, 'settings.json'), app.getPath('downloads'));
-  nativeTheme.themeSource = settings.get().theme;
+  nativeTheme.themeSource = nativeThemeSource(settings.get().theme);
   windows = new Windows(theme);
 
   manager = new Manager({
@@ -313,7 +313,7 @@ function applyLoginItem() {
 
 function onSettingsChanged(s, prev) {
   if (s.theme !== prev.theme) {
-    nativeTheme.themeSource = s.theme;
+    nativeTheme.themeSource = nativeThemeSource(s.theme);
     windows.applyTheme();
     windows.broadcast('theme:changed', theme());
   }

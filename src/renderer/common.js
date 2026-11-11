@@ -5,8 +5,8 @@
 
   // Theme id -> light/dark base (drives icon variants, color-scheme, dark-only rules).
   const THEME_BASE = {
-    light: 'light', dark: 'dark', paper: 'light', mint: 'light', day: 'light', sunset: 'light', retro: 'light',
-    oceanic: 'dark', desert: 'dark', night: 'dark', neon: 'dark', jungle: 'dark', terminal: 'dark',
+    light: 'light', dark: 'dark', day: 'light', paper: 'light', mint: 'light', retro: 'light',
+    night: 'dark', ocean: 'dark', neon: 'dark', jungle: 'dark',
   };
   function setTheme(t) {
     const id = THEME_BASE[t] ? t : 'light';

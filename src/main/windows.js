@@ -13,9 +13,21 @@ const TITLE_H = 32;
 const OVERLAY_H = TITLE_H - 1;
 
 // Window chrome colours per theme (title bar strip + caption buttons).
-const CHROME = {
-  light: { main: '#FFFFFF', dialog: '#FFFFFF', symbol: '#191919', bg: { main: '#F6F6F6', dialog: '#FFFFFF', player: '#000000' } },
-  dark: { main: '#141218', dialog: '#211F26', symbol: '#FFFFFF', bg: { main: '#141218', dialog: '#211F26', player: '#000000' } },
+// Native window chrome per theme: title-bar strip behind the caption buttons
+// (main window / dialogs), caption symbol colour, and window background.
+// Must match --title-bg / --dialog / --bg in styles/base.css + themes.css.
+const T = (base, main, dialog, symbol, bgMain, bgDialog) => ({ base, main, dialog, symbol, bg: { main: bgMain, dialog: bgDialog, player: '#000000' } });
+const THEMES = {
+  light: T('light', '#FFFFFF', '#FFFFFF', '#191919', '#F6F6F6', '#FFFFFF'),
+  dark: T('dark', '#141218', '#211F26', '#FFFFFF', '#141218', '#211F26'),
+  day: T('light', '#F6F9FF', '#FFFFFF', '#14213D', '#EEF4FF', '#FFFFFF'),
+  night: T('dark', '#161B2B', '#1D2335', '#FFFFFF', '#161B2B', '#1D2335'),
+  paper: T('light', '#FBF8F1', '#FFFCF6', '#2B2420', '#F4EFE6', '#FFFCF6'),
+  mint: T('light', '#FFFFFF', '#FFFFFF', '#14241C', '#EFF6F2', '#FFFFFF'),
+  ocean: T('dark', '#0A2A5E', '#0F3462', '#FFFFFF', '#0A2A5E', '#0F3462'),
+  neon: T('dark', '#1A0638', '#240A4A', '#FFFFFF', '#1A0638', '#240A4A'),
+  jungle: T('dark', '#0E2F23', '#143A2C', '#FFFFFF', '#0E2F23', '#143A2C'),
+  retro: T('light', '#000080', '#000080', '#FFFFFF', '#C0C0C0', '#C0C0C0'),
 };
 
 class Windows {
@@ -36,7 +48,7 @@ class Windows {
   }
 
   chromeFor(kind) {
-    const t = CHROME[this.getTheme()];
+    const t = THEMES[this.getTheme()] || THEMES.light;
     const role = kind === 'main' ? 'main' : 'dialog';
     return { color: t[role], symbolColor: t.symbol, height: OVERLAY_H, bg: t.bg[kind] || t.bg.dialog };
   }
@@ -198,9 +210,15 @@ class Windows {
   }
 }
 
+/** Settings value ('system' or a theme id) -> the theme id to render. */
 function resolveTheme(setting) {
-  if (setting === 'light' || setting === 'dark') return setting;
+  if (THEMES[setting]) return setting;
   return nativeTheme.shouldUseDarkColors ? 'dark' : 'light';
 }
 
-module.exports = { Windows, resolveTheme };
+/** What Electron's nativeTheme should follow (native menus, dialogs, scrollbars). */
+function nativeThemeSource(setting) {
+  return THEMES[setting] ? THEMES[setting].base : 'system';
+}
+
+module.exports = { Windows, resolveTheme, nativeThemeSource, THEMES };

@@ -256,6 +256,34 @@
 .about { display: flex; align-items: center; gap: 12px; }
 .about img { width: 36px; height: 36px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
 
+/* ------------------------------------------------ theme picker */
+.theme-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px 12px; padding: 2px 2px 12px; }
+.theme-card { display: flex; flex-direction: column; gap: 7px; font-size: 12px; font-weight: 600; color: var(--text-2); text-align: center; }
+.theme-card span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.theme-card > .theme-preview,
+.theme-card > .theme-split { height: 64px; border-radius: 7px; outline: 2px solid transparent; outline-offset: 2px; transition: outline-color 0.15s, transform 0.15s; }
+.theme-card:hover > .theme-preview,
+.theme-card:hover > .theme-split { outline-color: var(--stroke); transform: translateY(-1px); }
+.theme-card.on > .theme-preview,
+.theme-card.on > .theme-split { outline-color: var(--blue); }
+.theme-card.on span { color: var(--text); }
+.theme-preview { position: relative; overflow: hidden; border-radius: 7px; background: var(--bg); background-image: var(--bg-image); border: 1px solid var(--stroke); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1); }
+.theme-preview i, .theme-preview b { display: block; }
+.tp-title { position: absolute; inset: 0 0 auto 0; height: 7px; background: var(--title-bg); border-bottom: 1px solid var(--title-line); }
+.tp-side { position: absolute; left: 6px; top: 12px; width: 26%; display: flex; flex-direction: column; gap: 4px; }
+.tp-add { height: 9px; border-radius: 2px; background: var(--blue-btn); }
+.tp-nav { height: 4px; width: 80%; border-radius: 2px; background: var(--text-3); opacity: 0.55; }
+.tp-nav.on { width: 92%; opacity: 1; background: var(--nav-active); }
+.tp-card { position: absolute; left: calc(26% + 12px); right: 6px; top: 12px; bottom: 6px; border-radius: 3px; background: var(--surface); border: 1px solid var(--stroke); padding: 5px; display: flex; flex-direction: column; gap: 4px; }
+.tp-line { height: 4px; width: 72%; border-radius: 2px; background: var(--text); opacity: 0.5; }
+.tp-line.short { width: 52%; }
+.tp-bar { position: relative; height: 3px; background: var(--track); }
+.tp-bar b { position: absolute; inset: 0 auto 0 0; width: 62%; background: #12be42; }
+.tp-bar b.p { width: 36%; background: var(--paused); }
+.theme-split { position: relative; }
+.theme-split .theme-preview { position: absolute; inset: 0; }
+.theme-split .theme-preview:last-child { clip-path: polygon(58% 0, 100% 0, 100% 100%, 42% 100%); }
+
 /* ------------------------------------------------ banners / overlays */
 .power-banner {
   position: absolute; left: 8px; right: 8px; bottom: 8px; z-index: 5;
