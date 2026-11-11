@@ -155,7 +155,7 @@ window.SettingsView = (function () {
       group(
         'Browser integration',
         'browser',
-        row('Catch downloads from the browser', 'Chrome / Edge / Brave downloads are sent to Download Manager.', toggle((x) => x.browserIntegration, (v) => save({ browserIntegration: v }))),
+        row('Catch downloads from the browser', 'Chrome / Edge / Brave downloads are sent to KDM.', toggle((x) => x.browserIntegration, (v) => save({ browserIntegration: v }))),
         el(
           'ol',
           { class: 'steps' },
@@ -171,8 +171,8 @@ window.SettingsView = (function () {
         el(
           'div',
           { class: 'about', style: 'padding:4px 0 8px' },
-          el('img', { src: 'assets/icons/app-30.svg', alt: '' }),
-          el('div', {}, el('div', { class: 'set-label', text: `Download Manager ${info.version}` }), el('div', { class: 'set-hint', text: 'Minimal, multi-connection download manager.' }))
+          el('img', { src: 'assets/icons/logo.svg', alt: '' }),
+          el('div', {}, el('div', { class: 'set-label', text: `Kronos Download Manager ${String(info.version).replace(/\.0$/, '')}` }), el('div', { class: 'set-hint', text: 'KDM · minimal, multi-connection download manager.' }))
         )
       )
     );

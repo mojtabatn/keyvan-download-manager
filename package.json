@@ -1,8 +1,8 @@
 {
-  "name": "minimal-download-manager",
-  "productName": "Download Manager",
+  "name": "kronos-download-manager",
+  "productName": "Kronos Download Manager",
   "version": "0.1.0",
-  "description": "A minimal, fast, multi-connection download manager for Windows",
+  "description": "Kronos Download Manager (KDM): a minimal, fast, multi-connection download manager for Windows",
   "main": "src/main/main.js",
   "author": "Mojtaba",
   "license": "MIT",
@@ -28,8 +28,8 @@
     "resedit": "^3.1.0"
   },
   "build": {
-    "appId": "com.mojtaba.downloadmanager",
-    "productName": "Download Manager",
+    "appId": "com.mojtaba.kdm",
+    "productName": "Kronos Download Manager",
     "copyright": "Copyright \u00a9 2026 Mojtaba",
     "directories": {
       "output": "dist",
@@ -62,7 +62,7 @@
         }
       ],
       "icon": "build/icon.ico",
-      "executableName": "DownloadManager"
+      "executableName": "KDM"
     },
     "nsis": {
       "oneClick": false,
@@ -70,13 +70,13 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Download Manager",
+      "shortcutName": "Kronos Download Manager",
       "installerIcon": "build/icon.ico",
       "uninstallerIcon": "build/icon.ico",
-      "artifactName": "DownloadManager-Setup-${version}.${ext}"
+      "artifactName": "KDM-Setup-${version}.${ext}"
     },
     "portable": {
-      "artifactName": "DownloadManager-Portable-${version}.${ext}"
+      "artifactName": "KDM-Portable-${version}.${ext}"
     },
     "publish": null
   }

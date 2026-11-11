@@ -1,4 +1,4 @@
-// Download Manager — browser integration (Chrome / Edge / Brave, Manifest V3)
+// KDM (Kronos Download Manager) — browser integration (Chrome / Edge / Brave, Manifest V3)
 const APP = 'http://127.0.0.1:17842';
 const DEFAULTS = { enabled: true, minSizeKB: 512 };
 const SKIP_MIME = /^(image\/|text\/(html|css|javascript|plain)|application\/(json|javascript|xml|x-javascript|pdf))/i;
@@ -82,9 +82,9 @@ chrome.downloads.onCreated.addListener(async (item) => {
 // ---------------------------------------------------------------- context menu
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.removeAll(() => {
-    chrome.contextMenus.create({ id: 'dm-link', title: 'Download with Download Manager', contexts: ['link'] });
-    chrome.contextMenus.create({ id: 'dm-media', title: 'Download this media with Download Manager', contexts: ['video', 'audio', 'image'] });
-    chrome.contextMenus.create({ id: 'dm-all', title: 'Download all links with Download Manager', contexts: ['page'] });
+    chrome.contextMenus.create({ id: 'dm-link', title: 'Download with KDM', contexts: ['link'] });
+    chrome.contextMenus.create({ id: 'dm-media', title: 'Download this media with KDM', contexts: ['video', 'audio', 'image'] });
+    chrome.contextMenus.create({ id: 'dm-all', title: 'Download all links with KDM', contexts: ['page'] });
   });
 });
 

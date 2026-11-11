@@ -1,5 +1,5 @@
-// Renders the Figma app-icon SVGs to PNGs and packs build/icon.ico.
-// Small sizes use the 16px master (thin strokes), larger sizes the 30px master.
+// Renders the app logo (src/renderer/assets/icons/logo.svg, from Figma) to
+// PNGs and packs build/icon.ico, tray icons and the browser-extension icons.
 const fs = require('fs');
 const path = require('path');
 const { chromium } = require('playwright');
@@ -10,8 +10,9 @@ const out = path.join(root, 'build');
 
 (async () => {
   const pngToIco = (await import('png-to-ico')).default;
-  const svg16 = fs.readFileSync(path.join(icons, 'app-16.svg'), 'utf8');
-  const svg30 = fs.readFileSync(path.join(icons, 'app-30.svg'), 'utf8');
+  const logo = fs.readFileSync(path.join(icons, 'logo.svg'), 'utf8');
+  const svg16 = logo;
+  const svg30 = logo;
   const browser = await chromium.launch();
   const page = await browser.newPage();
   const render = async (svg, size, file) => {
@@ -26,9 +27,14 @@ const out = path.join(root, 'build');
   const files = [];
   for (const s of sizes) files.push(await render(s <= 24 ? svg16 : svg30, s, path.join(out, `icon-${s}.png`)));
   await render(svg30, 512, path.join(out, 'icon.png'));
-  // Tray icons
-  await render(svg16, 16, path.join(root, 'src/renderer/assets/tray-16.png'));
-  await render(svg16, 32, path.join(root, 'src/renderer/assets/tray-32.png'));
+  // Tray icons: the single-colour glyph, white for a dark taskbar and
+  // near-black for a light one (the app picks the matching pair at runtime).
+  const mono = fs.readFileSync(path.join(icons, 'logo-mono.svg'), 'utf8');
+  const monoDark = mono.replace(/#F6F6F6/gi, '#1B1B1F');
+  await render(mono, 16, path.join(root, 'src/renderer/assets/tray-light-16.png'));
+  await render(mono, 32, path.join(root, 'src/renderer/assets/tray-light-32.png'));
+  await render(monoDark, 16, path.join(root, 'src/renderer/assets/tray-dark-16.png'));
+  await render(monoDark, 32, path.join(root, 'src/renderer/assets/tray-dark-32.png'));
   await render(svg30, 256, path.join(root, 'src/renderer/assets/app-256.png'));
   // Browser-extension icons
   fs.mkdirSync(path.join(root, 'extension/icons'), { recursive: true });

@@ -77,7 +77,7 @@ class Windows {
       maximizable: resizable,
       fullscreenable: kind === 'player',
       show: false,
-      title: title || 'Download Manager',
+      title: title || 'Kronos Download Manager',
       icon: ICON,
       parent,
       backgroundColor: c.bg,
@@ -131,7 +131,7 @@ class Windows {
       minHeight: 440,
       resizable: true,
       show,
-      title: 'Download Manager',
+      title: 'Kronos Download Manager',
     });
     this.main.on('closed', () => (this.main = null));
     return this.main;
