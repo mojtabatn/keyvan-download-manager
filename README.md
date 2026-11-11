@@ -11,6 +11,19 @@ A minimal, fast download manager for Windows, built from the Figma design
 - Run something when the queue finishes: shut down, sleep, hibernate, or exit (60 s countdown you can cancel)
 - “How many downloads at a time” for the queue
 
+**Video downloads (IDM-style video grabber)**
+- Download videos from YouTube, X, Instagram, TikTok, Vimeo, Aparat and 1000+ other sites: paste the page link into
+  *Add Link*, or click **Download video** when you hover a video in the browser
+- Pick the quality (4K, 1080p, 720p…) or **Audio only (MP3)**; HD video and audio are merged automatically
+- The browser extension also detects streaming video (HLS `.m3u8`, DASH `.mpd`, MP4/WebM) on any page; the toolbar
+  badge shows how many it found
+- Powered by [yt-dlp](https://github.com/yt-dlp/yt-dlp) and [ffmpeg](https://ffmpeg.org), downloaded on first use
+  (about 54 MB) and updatable from Settings. DRM-protected services (Netflix, Spotify…) are not supported.
+
+**Many files at once**
+- Paste or drop several links, use *Download all links on this page* in the browser, or type a pattern like
+  `https://site.com/movie.part[01-12].rar`; a checklist lets you pick which ones to download
+
 **IDM-style extras**
 - Dynamic segmentation: a finished connection takes over half of the largest remaining part
 - “Start positions and progress by connections” map and a per-connection list (Details)

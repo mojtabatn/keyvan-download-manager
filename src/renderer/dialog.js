@@ -1,5 +1,5 @@
 'use strict';
-/* Add Link (step 1) → Download File Info (step 2), plus "Refresh link" mode. */
+/* Add Link → Download File Info / Download Video / several links (batch), plus "Refresh link" mode. */
 (function () {
   const { params, fmtBytes, catIcon, splitUrls, MEDIA_EXT } = DM;
   const $ = (id) => document.getElementById(id);
@@ -41,23 +41,15 @@
     if (text) status.append(DM.el('span', { text }));
   }
 
-  function setBatch(urls) {
-    ctx.batch = urls;
-    if (urls.length > 1) {
-      addr.value = urls[0];
-      setStatus(`+ ${urls.length - 1} more link${urls.length > 2 ? 's' : ''} — all will be added to the queue`);
-    } else setStatus('');
-  }
-
   addr.addEventListener('paste', (e) => {
+    if (mode === 'refresh') return;
     const urls = splitUrls(e.clipboardData.getData('text'));
     if (urls.length > 1) {
       e.preventDefault();
-      setBatch(urls);
+      showBatch(urls);
     }
   });
   addr.addEventListener('input', () => {
-    if (ctx.batch.length > 1 && addr.value !== ctx.batch[0]) setBatch([]);
     if (status.classList.contains('error')) setStatus('');
   });
   $('addCancel').addEventListener('click', close);
@@ -66,19 +58,21 @@
     e.preventDefault();
     if (okBtn.disabled) return;
     if (mode === 'refresh') return submitRefresh();
-    if (ctx.batch.length > 1) {
-      for (const url of ctx.batch) await api.invoke('downloads:add', { url, mode: 'queue', source: ctx.source });
-      await api.invoke('queue:start');
-      return close();
-    }
+    // "file.part[01-12].rar" -> 12 links
+    const expanded = expandPatterns(addr.value.trim());
+    if (expanded.length > 1) return showBatch(expanded);
     const url = normalizeUrl(addr.value);
     if (!url) return setStatus('Please enter a valid http(s) link', 'error'), addr.focus();
     ctx.url = url;
+    // YouTube, X, Instagram… go straight to the video dialog
+    if (await api.invoke('media:isVideoPage', url)) return showMedia({ url });
     busy(true);
     setStatus('Connecting…', 'busy');
     const info = await api.invoke('downloads:probe', { url, referrer: ctx.referrer, cookies: ctx.cookies, userAgent: ctx.userAgent });
     busy(false);
     if (info.error) return setStatus(info.error, 'error');
+    // A web page instead of a file: maybe there's a video on it
+    if (info.isWebPage) return showMedia({ url, fallbackInfo: { ...info, probed: true } });
     showInfo({ ...info, probed: true });
   });
 
@@ -139,10 +133,7 @@
     warn.hidden = !(info.isWebPage || info.warning);
     warn.textContent = info.warning || (info.isWebPage ? 'This link points to a web page, not a file.' : '');
     if ($('paneInfo').hidden) {
-      $('paneAdd').hidden = true;
-      $('paneInfo').hidden = false;
-      setTitle('Download File Info');
-      api.invoke('window:resize', 265); // 233 content + 32 title bar
+      showPane('paneInfo', 265, 'Download File Info'); // 233 content + 32 title bar
       setTimeout(() => $('infoDownload').focus(), 50);
     }
     updateAvailable();
@@ -199,6 +190,277 @@
     await api.invoke('player:open', { url: ctx.url, title: finalName(), referrer: ctx.referrer, cookies: ctx.cookies });
   });
 
+  // ------------------------------------------------------------ panes
+  const PANES = ['paneAdd', 'paneInfo', 'paneMedia', 'paneBatch'];
+  function showPane(id, height, title) {
+    for (const p of PANES) $(p).hidden = p !== id;
+    setTitle(title);
+    api.invoke('window:resize', height);
+  }
+
+  const joinPath = (dir, name) => (dir ? dir.replace(/[\\/]+$/, '') + (dir.includes('\\') ? '\\' : '/') + name : name);
+  async function defaultDirs() {
+    const s = await api.invoke('settings:get');
+    return {
+      video: s.categorize ? joinPath(s.downloadDir, 'Video') : s.downloadDir,
+      audio: s.categorize ? joinPath(s.downloadDir, 'Music') : s.downloadDir,
+      quality: String(s.videoQuality || 'best'),
+    };
+  }
+
+  // ------------------------------------------------------------ video (yt-dlp)
+  const media = { url: '', candidates: [], pageTitle: '', fallbackInfo: null, fileUrl: '', info: null, option: null, dirs: null, dir: '', dirTouched: false };
+
+  function mediaState(which) {
+    for (const id of ['mediaLoading', 'mediaInstall', 'mediaError', 'mediaReady']) $(id).hidden = id !== which;
+  }
+
+  async function showMedia({ url, candidates = [], title = '', fallbackInfo = null, fileUrl = '' }) {
+    Object.assign(media, { url, candidates, pageTitle: title, fallbackInfo, fileUrl });
+    media.dirs = await defaultDirs();
+    showPane('paneMedia', 440, 'Download Video');
+    probeMedia();
+  }
+
+  async function probeMedia() {
+    mediaState('mediaLoading');
+    $('mediaLoadingText').textContent = 'Looking for the video…';
+    try {
+      $('mediaLoadingSub').textContent = new URL(media.url).hostname.replace(/^www\./, '');
+    } catch {
+      $('mediaLoadingSub').textContent = '';
+    }
+    const r = await api.invoke('media:probe', { url: media.url, candidates: media.candidates, referrer: ctx.referrer, cookies: ctx.cookies, userAgent: ctx.userAgent });
+    if (r.needsTools) {
+      $('mediaInstallSize').textContent = String(r.status.downloadSize || 53);
+      return mediaState('mediaInstall');
+    }
+    if (r.error) {
+      $('mediaErrorText').textContent = r.error;
+      $('mediaAsFile').hidden = !(media.fallbackInfo || media.fileUrl);
+      return mediaState('mediaError');
+    }
+    renderMedia(r);
+  }
+
+  const fmtDur = (s) => {
+    s = Math.round(s || 0);
+    if (!s) return '';
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = String(s % 60).padStart(2, '0');
+    return h ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`;
+  };
+
+  function renderMedia(r) {
+    media.info = r;
+    // For raw streams (no site extractor) the page title is the better name.
+    const generic = /\./.test(r.site);
+    $('mediaTitle').value = (generic && media.pageTitle) || r.title;
+    $('mediaMeta').textContent = [r.site, fmtDur(r.duration)].filter(Boolean).join(' · ');
+    const thumb = $('mediaThumb');
+    const img = $('mediaThumbImg');
+    thumb.classList.add('empty');
+    img.hidden = true;
+    if (r.thumbnail) {
+      // keep the logo placeholder until (unless) the thumbnail actually loads
+      img.onload = () => {
+        img.hidden = false;
+        thumb.classList.remove('empty');
+      };
+      img.onerror = () => (img.hidden = true);
+      img.src = r.thumbnail;
+    }
+    const pref = media.dirs.quality;
+    const opts = r.options;
+    let pick = opts[0];
+    if (pref === 'audio') pick = opts.find((o) => o.audioOnly) || pick;
+    else if (/^\d+$/.test(pref)) pick = opts.find((o) => !o.audioOnly && o.height && o.height <= Number(pref)) || pick;
+    const list = $('qualityList');
+    list.replaceChildren(
+      ...opts.map((o) => {
+        const row = DM.el(
+          'div',
+          { class: 'q-row', role: 'radio', tabindex: '0' },
+          DM.el('span', { class: 'q-dot' }),
+          DM.el('span', { class: 'q-label', text: o.label }),
+          DM.el('span', { class: 'q-detail', text: o.detail }),
+          DM.el('span', { class: 'q-size', text: o.size > 0 ? `~${fmtBytes(o.size)}` : '' })
+        );
+        row.addEventListener('click', () => selectOption(o, row));
+        row.addEventListener('dblclick', () => addMedia('now'));
+        o.row = row;
+        return row;
+      })
+    );
+    selectOption(pick, pick.row);
+    mediaState('mediaReady');
+    setTimeout(() => $('mediaDownload').focus(), 50);
+  }
+
+  function selectOption(o, row) {
+    media.option = o;
+    for (const r of $('qualityList').children) r.classList.toggle('on', r === row);
+    if (!media.dirTouched) media.dir = o.audioOnly ? media.dirs.audio : media.dirs.video;
+    $('mediaDir').textContent = media.dir;
+    $('mediaFolder').title = media.dir;
+  }
+
+  async function addMedia(modeName) {
+    const o = media.option;
+    if (!o) return;
+    const source = media.info.source;
+    await api.invoke('downloads:add', {
+      type: 'media',
+      url: source,
+      title: $('mediaTitle').value.trim() || media.info.title,
+      format: o.format,
+      audioOnly: o.audioOnly,
+      ext: o.ext,
+      quality: o.label,
+      size: o.size,
+      dir: media.dir,
+      referrer: ctx.referrer || (source !== media.url ? media.url : ''),
+      cookies: ctx.cookies,
+      userAgent: ctx.userAgent,
+      mode: modeName,
+      source: ctx.source,
+    });
+    close();
+  }
+
+  $('paneMedia').addEventListener('submit', (e) => {
+    e.preventDefault();
+    addMedia('now');
+  });
+  $('mediaLater').addEventListener('click', () => addMedia('queue'));
+  $('mediaErrorClose').addEventListener('click', close);
+  $('mediaFolder').addEventListener('click', async () => {
+    const dir = await api.invoke('dialog:pickFolder', media.dir);
+    if (!dir) return;
+    media.dir = dir;
+    media.dirTouched = true;
+    $('mediaDir').textContent = dir;
+  });
+  $('mediaAsFile').addEventListener('click', async () => {
+    if (media.fallbackInfo) return showInfo(media.fallbackInfo);
+    ctx.url = media.fileUrl;
+    const info = await api.invoke('downloads:probe', { url: ctx.url, referrer: ctx.referrer, cookies: ctx.cookies, userAgent: ctx.userAgent });
+    if (info.error) {
+      $('mediaErrorText').textContent = info.error;
+      return;
+    }
+    showInfo({ ...info, probed: true });
+  });
+  $('mediaInstallBtn').addEventListener('click', async () => {
+    const btn = $('mediaInstallBtn');
+    btn.disabled = true;
+    btn.textContent = 'Installing…';
+    $('mediaInstallProgress').hidden = false;
+    const off = api.on('media:install-progress', (p) => {
+      const pct = p.total > 0 ? (p.received / p.total) * 100 : 0;
+      $('mediaInstallFill').style.width = `${pct.toFixed(1)}%`;
+      $('mediaInstallText').textContent = p.total > 0 ? `${fmtBytes(p.received)} / ${fmtBytes(p.total)}` : fmtBytes(p.received);
+    });
+    const r = await api.invoke('media:install');
+    off();
+    if (r && r.error) {
+      btn.disabled = false;
+      btn.textContent = 'Try again';
+      $('mediaInstallText').textContent = r.error;
+      return;
+    }
+    probeMedia();
+  });
+
+  // ------------------------------------------------------------ several links (batch)
+  /** Expands "file.part[01-12].rar" / "img[a-f].jpg" into individual links (max 1000). */
+  function expandPatterns(text) {
+    const m = /\[(\d+)-(\d+)\]|\[([a-z])-([a-z])\]/i.exec(text);
+    if (!m) return [text];
+    const out = [];
+    const put = (v) => out.push(text.slice(0, m.index) + v + text.slice(m.index + m[0].length));
+    if (m[1] !== undefined) {
+      const a = Number(m[1]);
+      const b = Number(m[2]);
+      const width = m[1].length > 1 && m[1].startsWith('0') ? m[1].length : 0;
+      for (let i = Math.min(a, b); i <= Math.max(a, b) && out.length < 1000; i++) put(width ? String(i).padStart(width, '0') : String(i));
+    } else {
+      const a = m[3].charCodeAt(0);
+      const b = m[4].charCodeAt(0);
+      for (let c = Math.min(a, b); c <= Math.max(a, b); c++) put(String.fromCharCode(c));
+    }
+    return out.flatMap(expandPatterns).slice(0, 1000);
+  }
+
+  const batch = { items: [] };
+  function nameOf(url) {
+    try {
+      const u = new URL(url);
+      return decodeURIComponent(u.pathname.split('/').filter(Boolean).pop() || u.hostname);
+    } catch {
+      return url;
+    }
+  }
+
+  function showBatch(urls) {
+    const list = [...new Set(urls.map((u) => normalizeUrl(u)).filter(Boolean))];
+    batch.items = list.map((url) => ({ url, on: true }));
+    const box = $('batchList');
+    box.replaceChildren(
+      ...batch.items.map((it) => {
+        const cb = DM.el('input', { type: 'checkbox', checked: true });
+        const name = nameOf(it.url);
+        let host = '';
+        try {
+          host = new URL(it.url).hostname.replace(/^www\./, '');
+        } catch {}
+        const row = DM.el('label', { class: 'b-row', title: it.url }, cb, DM.el('img', { class: 'b-cat', src: catIcon(categoryFromName(name), 'min'), alt: '' }), DM.el('span', { class: 'b-name', text: name }), DM.el('span', { class: 'b-host', text: host }));
+        cb.addEventListener('change', () => {
+          it.on = cb.checked;
+          row.classList.toggle('off', !cb.checked);
+          updateBatch();
+        });
+        it.cb = cb;
+        return row;
+      })
+    );
+    $('batchAll').checked = true;
+    updateBatch();
+    showPane('paneBatch', 420, `Add ${list.length} Downloads`);
+    setTimeout(() => $('batchStart').focus(), 50);
+  }
+
+  function updateBatch() {
+    const n = batch.items.filter((i) => i.on).length;
+    $('batchCount').textContent = `${batch.items.length} link${batch.items.length === 1 ? '' : 's'}`;
+    $('batchStatus').textContent = `${n} of ${batch.items.length} selected`;
+    $('batchAll').checked = n === batch.items.length;
+    $('batchAll').indeterminate = n > 0 && n < batch.items.length;
+    $('batchStart').disabled = $('batchQueue').disabled = n === 0;
+  }
+
+  $('batchAll').addEventListener('change', (e) => {
+    for (const it of batch.items) {
+      it.on = e.target.checked;
+      it.cb.checked = it.on;
+      it.cb.closest('.b-row').classList.toggle('off', !it.on);
+    }
+    updateBatch();
+  });
+
+  async function addBatch(start) {
+    for (const it of batch.items) if (it.on) await api.invoke('downloads:add', { url: it.url, mode: 'queue', source: ctx.source });
+    if (start) await api.invoke('queue:start');
+    close();
+  }
+  $('paneBatch').addEventListener('submit', (e) => {
+    e.preventDefault();
+    addBatch(true);
+  });
+  $('batchQueue').addEventListener('click', () => addBatch(false));
+  $('batchCancel').addEventListener('click', close);
+
   // ------------------------------------------------------------ boot
   (async function boot() {
     if (mode === 'refresh') {
@@ -229,10 +491,22 @@
       }
       return;
     }
+    if (mode === 'media') {
+      // "Download this video" from the browser extension
+      const p = (await api.invoke('dialog:payload', params.get('token'))) || {};
+      Object.assign(ctx, { referrer: p.referrer || p.pageUrl || '', cookies: p.cookies || '', userAgent: p.userAgent || '', source: 'browser' });
+      const rank = { hls: 0, dash: 1, file: 2 };
+      const streams = (p.streams || []).slice().sort((a, b) => (rank[a.kind] ?? 3) - (rank[b.kind] ?? 3) || (b.size || 0) - (a.size || 0)).map((x) => x.url);
+      const sitePage = p.pageUrl && (await api.invoke('media:isVideoPage', p.pageUrl));
+      const order = sitePage ? [p.pageUrl, ...streams, p.frameUrl] : [...streams, p.frameUrl, p.pageUrl];
+      const list = [...new Set(order.filter(Boolean))];
+      const file = (p.streams || []).find((x) => x.kind === 'file');
+      return showMedia({ url: list[0], candidates: list.slice(1), title: p.title || '', fileUrl: file ? file.url : '' });
+    }
     const pre = params.get('url') || '';
     const urls = splitUrls(pre);
-    if (urls.length > 1) setBatch(urls);
-    else addr.value = urls[0] || '';
+    if (urls.length > 1) return showBatch(urls);
+    addr.value = urls[0] || '';
     setTimeout(() => {
       addr.focus();
       addr.select();

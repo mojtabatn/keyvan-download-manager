@@ -15,6 +15,8 @@ function defaults(downloadsDir) {
     speedLimit: 0, // KB/s, 0 = unlimited
     maxRetries: 10,
     listView: 'cards', // 'cards' (large icons) | 'compact' (list without icons)
+    videoQuality: 'best', // preselected quality: 'best' | '2160' | '1080' | '720' | '480' | '360' | 'audio'
+    videoButton: true, // show the "Download video" button on web pages (browser extension)
     showProgressWindow: true,
     showCompleteWindow: true,
     clipboardWatch: true,
@@ -100,6 +102,7 @@ function sanitizePatch(p) {
   if ('maxRetries' in out) out.maxRetries = clamp(out.maxRetries, 0, 100, 10);
   if ('theme' in out && !THEME_IDS.includes(out.theme)) delete out.theme;
   if ('listView' in out && !['cards', 'compact'].includes(out.listView)) delete out.listView;
+  if ('videoQuality' in out && !['best', '2160', '1080', '720', '480', '360', 'audio'].includes(String(out.videoQuality))) delete out.videoQuality;
   return out;
 }
 

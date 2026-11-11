@@ -139,12 +139,12 @@ class Windows {
 
   /** Add-link / download-info dialog. query: { mode: 'add'|'info'|'refresh', url, ... } */
   openDialog(query) {
-    const sizes = { add: 186, info: 265, refresh: 186 };
+    const sizes = { add: 186, info: 265, refresh: 186, media: 440 };
     const win = this.create('dialog', 'dialog.html', {
       width: 580,
       height: sizes[query.mode] || 186,
       query: { ...query, payload: query.payload ? JSON.stringify(query.payload) : '' },
-      title: query.mode === 'info' ? 'Download File Info' : 'Add New Download',
+      title: query.mode === 'info' ? 'Download File Info' : query.mode === 'media' ? 'Download Video' : 'Add New Download',
     });
     this.dialogs.add(win);
     win.on('closed', () => this.dialogs.delete(win));

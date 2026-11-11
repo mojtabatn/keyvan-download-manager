@@ -75,6 +75,39 @@ window.SettingsView = (function () {
     return f;
   }
 
+  /** yt-dlp + ffmpeg status with an Install / Update button. */
+  function videoTools() {
+    const line = el('div', { class: 'set-hint', style: 'font-size:12px' });
+    const bar = el('div', { class: 'bar', style: 'height:4px;border-radius:2px;margin-top:8px;width:220px', hidden: true }, el('div', { class: 'fill', style: 'background:var(--blue)' }));
+    const btn = el('button', { class: 'btn btn-outline blue text-only', style: 'height:32px;font-size:13px;padding:4px 14px' });
+    let ready = false;
+    const refresh = async () => {
+      const st = await api.invoke('media:status');
+      ready = st.ready;
+      line.textContent = st.ready
+        ? `Installed · yt-dlp ${st.ytdlp.version || ''} · ffmpeg`
+        : `Not installed yet · one-time download of about ${st.downloadSize} MB (yt-dlp + ffmpeg)`;
+      btn.textContent = st.ready ? 'Update' : 'Install';
+      btn.disabled = st.installing;
+    };
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      btn.textContent = ready ? 'Updating…' : 'Installing…';
+      bar.hidden = ready;
+      const off = api.on('media:install-progress', (p) => {
+        if (p.total > 0) bar.firstChild.style.width = `${((p.received / p.total) * 100).toFixed(1)}%`;
+      });
+      const r = await api.invoke(ready ? 'media:update' : 'media:install');
+      off();
+      bar.hidden = true;
+      await refresh();
+      if (r && r.error) DM.toast(r.error, 4000);
+      else DM.toast(ready ? 'Video support is up to date' : 'Video support installed');
+    });
+    refresh();
+    return el('div', { class: 'set-row' }, el('div', { class: 'set-text' }, el('div', { class: 'set-label', text: 'Video support (yt-dlp + ffmpeg)' }), line, bar), btn);
+  }
+
   function mount(container, settings, info) {
     root = container;
     s = settings;
@@ -112,6 +145,18 @@ window.SettingsView = (function () {
         row('Show “download complete” window', null, toggle((x) => x.showCompleteWindow, (v) => save({ showCompleteWindow: v }))),
         row('Watch clipboard for links', 'Copying a file link opens the Add Link window.', toggle((x) => x.clipboardWatch, (v) => save({ clipboardWatch: v }))),
         row('Prevent sleep while downloading', null, toggle((x) => x.preventSleep, (v) => save({ preventSleep: v })))
+      ),
+      group(
+        'Video downloads',
+        'video',
+        el('div', { class: 'set-hint', style: 'margin:-2px 0 6px;font-size:12px', text: 'Download videos from YouTube, X, Instagram and 1000+ sites — paste the page link in “Add Link” or use the “Download video” button in the browser. DRM-protected services (Netflix, Spotify…) aren’t supported.' }),
+        videoTools(),
+        row(
+          'Default quality',
+          'Pre-selected in the video window; you can always pick another.',
+          select([['best', 'Best available'], ['2160', '4K (2160p)'], ['1080', '1080p'], ['720', '720p'], ['480', '480p'], ['360', '360p'], ['audio', 'Audio only (MP3)']], (x) => x.videoQuality || 'best', (v) => save({ videoQuality: v }))
+        ),
+        row('“Download video” button on web pages', 'Shown by the browser extension when you hover a video.', toggle((x) => x.videoButton !== false, (v) => save({ videoButton: v })))
       ),
       group(
         'Browser integration',

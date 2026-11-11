@@ -72,11 +72,9 @@ function probeInfo(ytdlp, url, headers = {}, timeout = 90000) {
 }
 
 function cleanError(text) {
-  const line = String(text || '')
-    .split(/\r?\n/)
-    .filter((l) => /ERROR:/.test(l))
-    .pop();
-  if (!line) return '';
+  const lines = String(text || '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const line = lines.filter((l) => /ERROR:/.test(l)).pop();
+  if (!line) return lines.length ? lines[lines.length - 1].slice(0, 200) : '';
   let msg = line.replace(/^.*?ERROR:\s*/, '').replace(/\[[^\]]+\]\s*[\w-]+:\s*/, '');
   if (/Unsupported URL/i.test(msg)) msg = 'No video found on this page';
   if (/DRM/i.test(msg)) msg = 'This video is DRM-protected and can’t be downloaded';
@@ -85,6 +83,7 @@ function cleanError(text) {
   return msg.slice(0, 200);
 }
 
+const SITE_NAMES = { Youtube: 'YouTube', YoutubeTab: 'YouTube', Twitter: 'X', TwitterBroadcast: 'X', Instagram: 'Instagram', TikTok: 'TikTok', Vimeo: 'Vimeo', Facebook: 'Facebook', Aparat: 'Aparat', SoundCloud: 'SoundCloud', Twitch: 'Twitch' };
 const sizeOf = (f, dur) => (f && (f.filesize || f.filesize_approx || (f.tbr && dur ? f.tbr * 125 * dur : 0))) || 0;
 const codecName = (c = '') => (/^avc1|h264/i.test(c) ? 'H.264' : /^vp0?9/i.test(c) ? 'VP9' : /^av01/i.test(c) ? 'AV1' : /^hev|hvc|h265/i.test(c) ? 'HEVC' : '');
 const nick = (h) => (h >= 2160 ? '4K' : h >= 1440 ? '2K' : h >= 1080 ? 'Full HD' : h >= 720 ? 'HD' : '');
@@ -133,7 +132,7 @@ async function probeMedia(ytdlp, url, headers) {
   return {
     url,
     title: info.title || info.fulltitle || 'video',
-    site: info.extractor_key && info.extractor_key !== 'Generic' ? info.extractor_key : new URL(url).hostname.replace(/^www\./, ''),
+    site: info.extractor_key && info.extractor_key !== 'Generic' ? SITE_NAMES[info.extractor_key] || info.extractor_key : new URL(url).hostname.replace(/^www\./, ''),
     duration: info.duration || 0,
     thumbnail: /^https?:/.test(thumb) ? thumb : '',
     options: buildOptions(info),
@@ -244,7 +243,19 @@ class MediaDownload extends EventEmitter {
     return this.runPromise;
   }
 
-  run() {
+  async run() {
+    try {
+      await fsp.mkdir(this.d.dir, { recursive: true });
+    } catch (e) {
+      this.d.error = e.code === 'EACCES' || e.code === 'EPERM' ? 'No permission to write to the folder' : e.message;
+      this.setStatus('error');
+      this.emit('failed', this);
+      return;
+    }
+    return this.spawnYtdlp();
+  }
+
+  spawnYtdlp() {
     return new Promise((resolve) => {
       const tools = this.ctx.tools;
       if (!tools.ready()) {

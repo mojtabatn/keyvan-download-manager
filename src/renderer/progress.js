@@ -128,7 +128,8 @@
 
     const speed = $('speed');
     speed.className = 'at dl-meta speed';
-    if (d.status === 'downloading') speed.textContent = fmtSpeed(d.speed);
+    if (d.status === 'downloading' && d.stage) speed.textContent = d.stage;
+    else if (d.status === 'downloading') speed.textContent = fmtSpeed(d.speed);
     else if (d.status === 'connecting') speed.textContent = 'Connecting…';
     else if (d.status === 'error') {
       speed.textContent = d.error || 'Error';
@@ -152,7 +153,8 @@
     if (d.size > 0 && !done) size.append(el('span', { class: running ? '' : 'strong', text: fmtBytes(d.downloaded) }), `/${fmtBytes(d.size)}`);
     else size.textContent = fmtBytes(done ? d.size : d.downloaded);
 
-    // Buttons
+    // Buttons (video downloads have no connection map, so no Details)
+    $('detailsBtn').hidden = d.type === 'media';
     $('toggle').hidden = done;
     $('openFile').hidden = !done;
     $('openFolder').hidden = !done;

@@ -29,6 +29,8 @@ const { Windows, resolveTheme, nativeThemeSource } = require('./windows');
 const { startIntegrationServer } = require('./integration/server');
 const { watchClipboard } = require('./integration/clipboard');
 const { PowerActions } = require('./power');
+const { Components } = require('./media/components');
+const { probeMedia, isVideoPage } = require('./media/media');
 
 const APP_ID = 'com.mojtaba.kdm';
 const ASSETS = path.join(__dirname, '..', 'renderer', 'assets');
@@ -64,6 +66,7 @@ let windows;
 let tray;
 let clip;
 let power;
+let tools;
 let blockerId = null;
 let quitting = false;
 let shutdownDone = false;
@@ -82,9 +85,12 @@ app.whenReady().then(() => {
   nativeTheme.themeSource = nativeThemeSource(settings.get().theme);
   windows = new Windows(theme);
 
+  // yt-dlp + ffmpeg for video downloads live next to the user's data (downloaded on first use)
+  tools = new Components(process.env.DM_TOOLS_DIR || path.join(userData, 'bin'));
   manager = new Manager({
     file: path.join(userData, 'downloads.json'),
     getSettings: () => settings.get(),
+    tools,
   });
   manager.load();
   wireManagerEvents();
@@ -109,6 +115,7 @@ app.whenReady().then(() => {
     version: app.getVersion(),
     isEnabled: () => settings.get().browserIntegration,
     onDownload: (p) => openFromBrowser(p),
+    extra: () => ({ videoButton: settings.get().videoButton !== false }),
   });
 
   clip = watchClipboard({
@@ -283,6 +290,14 @@ function openAddDialog({ url = '', source = 'manual' } = {}) {
 }
 
 function openFromBrowser(p) {
+  if (p.media) {
+    // "Download this video" from the browser: let the video dialog find the best source
+    const token = crypto.randomUUID();
+    dialogPayloads.set(token, { ...p, source: 'browser' });
+    setTimeout(() => dialogPayloads.delete(token), 10 * 60 * 1000);
+    windows.openDialog({ mode: 'media', token });
+    return;
+  }
   if (p.urls && p.urls.length > 1) {
     const win = windows.openDialog({ mode: 'add', url: p.urls.join('\n'), source: 'browser' });
     win.__url = p.urls[0];
@@ -638,6 +653,39 @@ function registerIpc() {
   h('power:cancel', () => power.cancel());
   h('power:state', () => (power.pending ? { action: power.pending.action } : null));
   h('shell:openPath', (_e, p) => shell.openPath(String(p || '')));
+
+  // ---- video downloads (yt-dlp + ffmpeg)
+  h('media:status', () => tools.status());
+  h('media:install', async () => {
+    try {
+      return await tools.install((p) => windows.broadcast('media:install-progress', p));
+    } catch (e) {
+      return { error: `Couldn't download video support: ${e.message}` };
+    }
+  });
+  h('media:update', async () => {
+    try {
+      return await tools.update();
+    } catch (e) {
+      return { error: e.message };
+    }
+  });
+  h('media:isVideoPage', (_e, url) => isVideoPage(String(url || '')));
+  /** Tries each candidate (page, embedded player, sniffed streams) until yt-dlp finds a video. */
+  h('media:probe', async (_e, opts = {}) => {
+    if (!tools.ready()) return { needsTools: true, status: await tools.status() };
+    const headers = { referrer: opts.referrer, cookies: opts.cookies, userAgent: opts.userAgent };
+    const candidates = [...new Set([opts.url, ...(opts.candidates || [])].filter((u) => /^https?:\/\//i.test(u || '')))];
+    let lastError = 'No video found on this page';
+    for (const url of candidates) {
+      try {
+        return { ...(await probeMedia(tools.ytdlpPath, url, headers)), source: url };
+      } catch (e) {
+        lastError = e.message;
+      }
+    }
+    return { error: lastError };
+  });
   h('shell:openProject', () => {
     const url = projectUrl();
     if (!url) return false;

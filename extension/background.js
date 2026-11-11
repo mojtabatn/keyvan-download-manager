@@ -121,3 +121,100 @@ chrome.runtime.onMessage.addListener((msg, _sender, reply) => {
   }
   return false;
 });
+
+// ================================================================ video grabber
+// Watches network traffic for video streams per tab (HLS / DASH / files),
+// shows a count on the toolbar badge, and hands videos to KDM on request.
+const VIDEO_FILE = /\.(mp4|webm|mkv|mov|m4v|flv|mp3|m4a|ogg|oga|wav)(\?|$)/i;
+const SEGMENT = /\.(ts|m4s|aac|vtt|webvtt|key)(\?|$)|[?&](range|rn|rbuf)=|\/videoplayback\b|\/(seg|segment|chunk|frag)[-_]?\d+/i;
+
+const header = (headers, name) => (headers || []).find((h) => h.name.toLowerCase() === name)?.value || '';
+const tabKey = (id) => `media:${id}`;
+
+async function getMedia(tabId) {
+  const r = await chrome.storage.session.get(tabKey(tabId));
+  return r[tabKey(tabId)] || [];
+}
+
+// Detections can arrive at the same moment: run each tab's updates one at a time.
+const tabLocks = new Map();
+function withTab(tabId, fn) {
+  const next = (tabLocks.get(tabId) || Promise.resolve()).then(fn, fn);
+  tabLocks.set(tabId, next.catch(() => {}));
+  return next;
+}
+
+async function setMedia(tabId, list) {
+  await chrome.storage.session.set({ [tabKey(tabId)]: list });
+  chrome.action.setBadgeText({ tabId, text: list.length ? String(list.length) : '' }).catch(() => {});
+  chrome.action.setBadgeBackgroundColor({ tabId, color: '#7367F0' }).catch(() => {});
+}
+
+chrome.webRequest.onHeadersReceived.addListener(
+  (d) => {
+    if (d.tabId < 0 || d.statusCode >= 400 || !/^https?:/i.test(d.url)) return;
+    const ct = header(d.responseHeaders, 'content-type').toLowerCase();
+    const url = d.url;
+    let kind = null;
+    if (/mpegurl/.test(ct) || /\.m3u8(\?|$)/i.test(url)) kind = 'hls';
+    else if (/dash\+xml/.test(ct) || /\.mpd(\?|$)/i.test(url)) kind = 'dash';
+    else if ((/^(video|audio)\//.test(ct) || VIDEO_FILE.test(url)) && !SEGMENT.test(url) && !/mp2t/.test(ct)) kind = 'file';
+    if (!kind) return;
+    const range = /\/(\d+)\s*$/.exec(header(d.responseHeaders, 'content-range'));
+    const size = range ? Number(range[1]) : Number(header(d.responseHeaders, 'content-length')) || -1;
+    if (kind === 'file' && size > 0 && size < 300 * 1024) return; // previews, ads, UI sounds
+    withTab(d.tabId, async () => {
+      const list = await getMedia(d.tabId);
+      const dir = (u) => u.split('?')[0].replace(/[^/]*$/, '');
+      // a master playlist is fetched first; its variant playlists live next to it
+      if (list.some((x) => x.url === url || (kind !== 'file' && x.kind === kind && dir(x.url) === dir(url)))) return;
+      list.push({ url, kind, size, mime: ct.split(';')[0], time: Date.now() });
+      await setMedia(d.tabId, list.slice(-20));
+    });
+  },
+  { urls: ['<all_urls>'], types: ['media', 'xmlhttprequest', 'other', 'object'] },
+  ['responseHeaders']
+);
+
+// New page in the tab (including YouTube-style in-page navigation): start over.
+chrome.tabs.onUpdated.addListener((tabId, info) => {
+  if (info.url) withTab(tabId, () => setMedia(tabId, []));
+});
+chrome.tabs.onRemoved.addListener((tabId) => chrome.storage.session.remove(tabKey(tabId)));
+
+/** Sends "download the video on this tab" to KDM. preferred: a specific stream to try first. */
+async function grabVideo(tab, { frameUrl = '', src = '', title = '', preferred = null } = {}) {
+  const found = await getMedia(tab.id);
+  const streams = preferred ? [preferred, ...found.filter((x) => x.url !== preferred.url)] : [...found];
+  if (/^https?:/i.test(src) && !streams.some((x) => x.url === src)) streams.unshift({ url: src, kind: 'file', size: -1 });
+  return send({
+    media: true,
+    pageUrl: tab.url || '',
+    frameUrl: frameUrl && frameUrl !== tab.url ? frameUrl : '',
+    title: title || tab.title || '',
+    streams,
+    referrer: tab.url || '',
+    cookies: await cookiesFor(tab.url || (streams[0] && streams[0].url) || ''),
+  });
+}
+
+chrome.runtime.onMessage.addListener((msg, sender, reply) => {
+  if (!msg) return false;
+  if (msg.type === 'grabber-config') {
+    Promise.all([getConfig(), ping(600)]).then(([cfg, app]) => reply({ enabled: cfg.videoButton !== false && (!app || app.videoButton !== false) }));
+    return true;
+  }
+  if (msg.type === 'grab-video' && sender.tab) {
+    grabVideo(sender.tab, { frameUrl: sender.frameId ? sender.url : '', src: msg.src, title: msg.title }).then(reply);
+    return true;
+  }
+  if (msg.type === 'tab-media') {
+    getMedia(msg.tabId).then(reply);
+    return true;
+  }
+  if (msg.type === 'grab-tab') {
+    chrome.tabs.get(msg.tabId).then((tab) => grabVideo(tab, { preferred: msg.preferred || null })).then(reply);
+    return true;
+  }
+  return false;
+});

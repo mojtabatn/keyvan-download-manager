@@ -232,7 +232,10 @@
     p.fill.style.width = `${pct(d)}%`;
     let left = '';
     let mid = '';
-    if (d.status === 'downloading') {
+    if (d.status === 'downloading' && d.stage) {
+      left = d.stage; // e.g. "Merging video and audio…"
+      mid = '';
+    } else if (d.status === 'downloading') {
       left = fmtSpeed(d.speed);
       mid = fmtEta(d.eta);
     } else if (d.status === 'connecting') left = 'Connecting…';
@@ -255,7 +258,7 @@
     const p = d.size > 0 ? `${Math.floor(pct(d))}%` : '';
     switch (d.status) {
       case 'completed': return 'Completed';
-      case 'downloading': return [p, fmtSpeed(d.speed)].filter(Boolean).join(' · ');
+      case 'downloading': return d.stage || [p, fmtSpeed(d.speed)].filter(Boolean).join(' · ');
       case 'connecting': return 'Connecting…';
       case 'paused': return ['Paused', p].filter(Boolean).join(' · ');
       case 'queued': return 'Queued';

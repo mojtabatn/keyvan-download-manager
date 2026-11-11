@@ -48,7 +48,7 @@ test('recognises common video sites', () => {
 test('probe turns yt-dlp formats into clear quality choices', async () => {
   const info = await probeMedia(FAKE, 'https://www.youtube.com/watch?v=abc', {});
   assert.strictEqual(info.title, 'Silo S01E08 – Trailer');
-  assert.strictEqual(info.site, 'Youtube');
+  assert.strictEqual(info.site, 'YouTube');
   const labels = info.options.map((o) => o.label);
   assert.deepStrictEqual(labels, ['1080p', '720p60', '360p', 'Audio only']);
   const hd = info.options[0];

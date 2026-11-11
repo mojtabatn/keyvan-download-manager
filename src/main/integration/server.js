@@ -12,7 +12,7 @@ const EXT_ORIGIN = /^(chrome|moz|edge|safari-web)-extension:\/\//;
  * Requests from web pages are refused (they always carry an http(s) Origin),
  * and the Host header is checked to block DNS-rebinding.
  */
-function startIntegrationServer({ version, isEnabled, onDownload }) {
+function startIntegrationServer({ version, isEnabled, onDownload, extra = () => ({}) }) {
   const server = http.createServer((req, res) => {
     const origin = req.headers.origin || '';
     const host = String(req.headers.host || '');
@@ -29,7 +29,7 @@ function startIntegrationServer({ version, isEnabled, onDownload }) {
       res.writeHead(204, { ...cors, 'Access-Control-Allow-Methods': 'GET, POST' });
       return res.end();
     }
-    if (req.method === 'GET' && req.url === '/ping') return json(200, { app: 'download-manager', version, enabled: isEnabled() });
+    if (req.method === 'GET' && req.url === '/ping') return json(200, { app: 'download-manager', version, enabled: isEnabled(), ...extra() });
     if (req.method === 'POST' && req.url === '/download') {
       if (!/application\/json/.test(req.headers['content-type'] || '')) return json(415, { error: 'json required' });
       let body = '';
@@ -47,6 +47,22 @@ function startIntegrationServer({ version, isEnabled, onDownload }) {
         }
         const valid = (u) => typeof u === 'string' && /^https?:\/\//i.test(u) && u.length < 8192;
         const urls = Array.isArray(p.urls) ? p.urls.filter(valid).slice(0, 500) : [];
+        if (p.media) {
+          // "Download this video": page URL plus any streams the extension saw
+          const streams = Array.isArray(p.streams) ? p.streams.filter((x) => x && valid(x.url)).slice(0, 30) : [];
+          if (!valid(p.pageUrl) && !streams.length) return json(400, { error: 'bad url' });
+          onDownload({
+            media: true,
+            pageUrl: valid(p.pageUrl) ? p.pageUrl : '',
+            frameUrl: valid(p.frameUrl) ? p.frameUrl : '',
+            title: typeof p.title === 'string' ? p.title.slice(0, 300) : '',
+            streams: streams.map((x) => ({ url: x.url, kind: String(x.kind || '').slice(0, 10), size: Number(x.size) || -1 })),
+            referrer: typeof p.referrer === 'string' ? p.referrer.slice(0, 4096) : '',
+            cookies: typeof p.cookies === 'string' ? p.cookies.slice(0, 16384) : '',
+            userAgent: typeof p.userAgent === 'string' ? p.userAgent.slice(0, 512) : '',
+          });
+          return json(200, { ok: true });
+        }
         if (!valid(p.url) && !urls.length) return json(400, { error: 'bad url' });
         onDownload({
           url: valid(p.url) ? p.url : undefined,

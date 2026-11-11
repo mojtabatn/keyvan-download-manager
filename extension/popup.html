@@ -26,7 +26,12 @@
         <option value="20480">20 MB</option>
       </select>
     </label>
-    <button id="grab">Download all links on this page</button>
+    <section class="videos">
+      <div class="v-head"><span>Videos on this page</span><span class="v-count" id="vCount">0</span></div>
+      <button id="grabVideo">Download video from this page</button>
+      <div class="v-list" id="vList"></div>
+    </section>
+    <button id="grab" class="secondary">Download all links on this page</button>
     <p class="hint">Right-click any link → “Download with KDM”.</p>
     <script src="popup.js"></script>
   </body>

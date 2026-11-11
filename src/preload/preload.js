@@ -31,6 +31,11 @@ const INVOKE = new Set([
   'power:state',
   'shell:openPath',
   'shell:openProject',
+  'media:status',
+  'media:install',
+  'media:update',
+  'media:isVideoPage',
+  'media:probe',
 ]);
 
 const EVENTS = new Set([
@@ -44,6 +49,7 @@ const EVENTS = new Set([
   'power:pending',
   'toast',
   'ui:command',
+  'media:install-progress',
 ]);
 
 contextBridge.exposeInMainWorld('api', {
