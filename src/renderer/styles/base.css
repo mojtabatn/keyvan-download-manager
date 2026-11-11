@@ -52,12 +52,16 @@
   --card-shadow: -5px 5px 30px rgba(0, 0, 0, 0.05);
   --menu-shadow: 0 8px 28px rgba(0, 0, 0, 0.14), 0 0 0 1px rgba(0, 0, 0, 0.04);
   --btn-edge: rgba(255, 255, 255, 0.1); /* white edge on primary buttons (10%) */
-  --btn3d: 0 0 0 1px #158aff, 0 0 0 3px rgba(0, 0, 0, 0.05), 0 2px 8px rgba(0, 0, 0, 0.25), inset 0 10px 15px rgba(255, 255, 255, 0.2);
+  --btn-ring: #158aff;
+  --btn3d: 0 0 0 1px var(--btn-ring), 0 0 0 3px rgba(0, 0, 0, 0.05), 0 2px 8px rgba(0, 0, 0, 0.25), inset 0 10px 15px rgba(255, 255, 255, 0.2);
+  --bg-image: none;
+  --accent-filter: none;
   --scroll: rgba(0, 0, 0, 0.16);
   --font: 'Manrope', 'Segoe UI Variable Text', 'Segoe UI', Tahoma, system-ui, sans-serif;
   --font-ui: var(--font);
 }
 
+:root[data-base='dark'] { color-scheme: dark; }
 :root[data-theme='dark'] {
   color-scheme: dark;
   --bg: #141218;
@@ -79,6 +83,7 @@
   --btn2-bg: transparent;
   --btn2-text: #ececec;
   --title-bg: #141218;
+  --blue-btn: #1e83f1;
   --title-text: rgba(255, 255, 255, 0.9);
   --title-line: #2a282f;
   --card-shadow: none;
@@ -86,14 +91,15 @@
   --btn3d: none;
   --scroll: rgba(255, 255, 255, 0.18);
 }
-body.dialog { --title-bg: var(--surface); }
-:root[data-theme='dark'] body.dialog { --title-line: #2f2c35; }
+body.dialog { --title-bg: var(--dialog, var(--surface)); }
+:root[data-base='dark'] body.dialog { --title-line: #2f2c35; }
 
 /* ------------------------------------------------------------------ base */
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; }
 body {
   background: var(--bg);
+  background-image: var(--bg-image);
   color: var(--text);
   font-family: var(--font);
   font-size: 12px;
@@ -101,7 +107,7 @@ body {
   user-select: none;
   -webkit-font-smoothing: antialiased;
 }
-body.dialog { background: var(--surface); }
+body.dialog { background: var(--dialog, var(--surface)); }
 img { display: block; -webkit-user-drag: none; }
 button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
 button:disabled { cursor: default; opacity: 0.5; }
@@ -109,8 +115,8 @@ input, select, textarea { font: inherit; color: inherit; }
 :focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
 [hidden] { display: none !important; }
 .only-dark { display: none; }
-:root[data-theme='dark'] .only-dark { display: block; }
-:root[data-theme='dark'] .only-light { display: none; }
+:root[data-base='dark'] .only-dark { display: block; }
+:root[data-base='dark'] .only-light { display: none; }
 
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb { background: var(--scroll); border-radius: 10px; border: 3px solid transparent; background-clip: content-box; }
@@ -166,13 +172,14 @@ input, select, textarea { font: inherit; color: inherit; }
   border: 1px solid var(--btn-edge);
   box-shadow: var(--btn3d);
 }
-:root[data-theme='dark'] .btn-primary { border-color: var(--btn-edge); }
+:root[data-base='dark'] .btn-primary { border-color: var(--btn-edge); }
 .btn-primary:hover:not(:disabled) { background: #2b8ff6; }
 .btn-secondary { background: var(--btn2-bg); color: var(--btn2-text); }
 .btn-secondary:hover:not(:disabled) { background: var(--hover); filter: brightness(0.98); }
 .btn-outline { background: var(--outline-bg); color: var(--btn2-text); }
 .btn-outline:hover:not(:disabled) { background: var(--hover); }
 .btn-outline.blue, .btn-secondary.blue { color: var(--link); }
+.btn-outline.blue img, .btn-secondary.blue img { filter: var(--accent-filter); }
 .btn-outline.green { color: var(--green-text); }
 .btn-link { font-size: 13px; font-weight: 500; color: var(--text-2); display: inline-flex; align-items: center; gap: 2px; height: 28px; padding: 0 6px; border-radius: 5px; }
 .btn-link:hover { background: var(--hover); }
@@ -228,7 +235,7 @@ input, select, textarea { font: inherit; color: inherit; }
 .switch input:focus-visible + span { outline: 2px solid var(--blue); outline-offset: 2px; }
 
 select.field { padding-right: 26px; appearance: none; background-image: url('../assets/icons/chevron-down.svg'); background-repeat: no-repeat; background-position: right 6px center; cursor: pointer; }
-:root[data-theme='dark'] select.field { background-image: url('../assets/icons/chevron-down-dark.svg'); }
+:root[data-base='dark'] select.field { background-image: url('../assets/icons/chevron-down-dark.svg'); }
 select.field option { background: var(--surface); color: var(--text); }
 
 /* toast */
@@ -239,7 +246,7 @@ select.field option { background: var(--surface); color: var(--text); }
   transition: opacity 0.18s, transform 0.18s; z-index: 100; max-width: 80vw;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-:root[data-theme='dark'] .toast { background: #ececec; color: #191919; }
+:root[data-base='dark'] .toast { background: #ececec; color: #191919; }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
 
 /* progress bar shared */

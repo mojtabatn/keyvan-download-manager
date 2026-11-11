@@ -31,9 +31,9 @@
 .dl-meta.speed.ok { color: var(--green-text); }
 .dl-meta.eta { left: 50%; transform: translateX(-50%); }
 .dl-meta .strong { color: var(--text-2); }
-:root[data-theme='dark'] .dl-meta .strong { color: #fff; }
+:root[data-base='dark'] .dl-meta .strong { color: var(--text); }
 .paused-state .dl-meta.eta { color: var(--text-2); }
-:root[data-theme='dark'] .paused-state .dl-meta.eta { color: #fff; }
+:root[data-base='dark'] .paused-state .dl-meta.eta { color: var(--text); }
 
 .details { position: absolute; left: 24px; right: 24px; top: 208px; }
 .det-head { display: flex; align-items: center; gap: 14px; font-size: 12px; color: var(--text-2); }

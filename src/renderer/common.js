@@ -3,8 +3,15 @@
 (function () {
   const params = new URLSearchParams(location.search);
 
+  // Theme id -> light/dark base (drives icon variants, color-scheme, dark-only rules).
+  const THEME_BASE = {
+    light: 'light', dark: 'dark', paper: 'light', mint: 'light', day: 'light', sunset: 'light', retro: 'light',
+    oceanic: 'dark', desert: 'dark', night: 'dark', neon: 'dark', jungle: 'dark', terminal: 'dark',
+  };
   function setTheme(t) {
-    document.documentElement.dataset.theme = t === 'dark' ? 'dark' : 'light';
+    const id = THEME_BASE[t] ? t : 'light';
+    document.documentElement.dataset.theme = id;
+    document.documentElement.dataset.base = THEME_BASE[id];
   }
   setTheme(params.get('theme'));
   window.api.on('theme:changed', setTheme);
