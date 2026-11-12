@@ -22,9 +22,14 @@ const DAY_KEYS = [0, 1, 2, 3, 4, 5, 6];
  *   'activity' ({ active, speed, progress })
  */
 class Manager extends EventEmitter {
-  constructor({ file, getSettings, tools = null }) {
+  /**
+   * secrets: { encrypt(text) -> string | null, decrypt(string) -> text | null } protects the browser
+   * cookies saved with a download (OS key store). Without it, cookies are never written to disk.
+   */
+  constructor({ file, getSettings, tools = null, secrets = null }) {
     super();
     this.file = file;
+    this.secrets = secrets;
     this.getSettings = getSettings;
     this.items = new Map();
     // per queue: { running, runCount, startedToday, stoppedToday }
@@ -50,14 +55,33 @@ class Manager extends EventEmitter {
     } catch {
       list = [];
     }
+    let plaintext = false;
     for (const data of Array.isArray(list) ? list : []) {
       if (!data || !data.id || !data.url) continue;
+      if (data.cookiesEnc) {
+        data.cookies = (this.secrets && safe(() => this.secrets.decrypt(data.cookiesEnc))) || '';
+        delete data.cookiesEnc;
+      } else if (data.cookies) plaintext = true; // saved by 0.1.0–0.1.2: re-save protected
+      if (data.status === 'completed') data.cookies = '';
       if (['downloading', 'connecting'].includes(data.status)) data.status = data.queued ? 'queued' : 'paused';
       if (data.status === 'removed') continue;
       const dl = data.type === 'media' ? new MediaDownload(data, this.mediaCtx) : new Download(data, this.ctx);
       this.hook(dl);
       this.items.set(dl.id, dl);
     }
+    if (plaintext) this.saveNow();
+  }
+
+  /** What goes into downloads.json: browser cookies only encrypted by the OS, never as plain text. */
+  serialize(dl) {
+    const j = dl.toJSON();
+    const cookies = j.cookies;
+    delete j.cookies;
+    if (cookies && dl.d.status !== 'completed' && this.secrets) {
+      const enc = safe(() => this.secrets.encrypt(cookies));
+      if (enc) j.cookiesEnc = enc;
+    }
+    return j;
   }
 
   save() {
@@ -67,7 +91,7 @@ class Manager extends EventEmitter {
 
   saveNow() {
     clearTimeout(this.saveTimer);
-    const data = JSON.stringify([...this.items.values()].map((d) => d.toJSON()));
+    const data = JSON.stringify([...this.items.values()].map((d) => this.serialize(d)));
     try {
       fs.mkdirSync(path.dirname(this.file), { recursive: true });
       const tmp = this.file + '.tmp';
@@ -126,6 +150,7 @@ class Manager extends EventEmitter {
       this.save();
     });
     dl.on('completed', () => {
+      dl.d.cookies = ''; // not needed any more; don't keep a copy of the site's login
       this.emit('completed', dl.snapshot());
       this.save();
     });
@@ -497,6 +522,14 @@ class Manager extends EventEmitter {
         if (st.running) this.stopQueue(q.id);
       }
     }
+  }
+}
+
+function safe(fn) {
+  try {
+    return fn();
+  } catch {
+    return null;
   }
 }
 

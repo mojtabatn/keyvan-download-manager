@@ -117,6 +117,7 @@ app.whenReady().then(() => {
     file: path.join(userData, 'downloads.json'),
     getSettings: () => settings.get(),
     tools,
+    secrets: osSecrets(),
   });
   manager.load();
   wireManagerEvents();
@@ -211,6 +212,25 @@ function migrateFromOldName() {
   } catch (e) {
     logError('migrate', e);
   }
+}
+
+/**
+ * Encryption by the operating system (Windows DPAPI, macOS Keychain, Linux keyring) for the browser
+ * cookies saved with unfinished downloads. null when no real key store is available: then cookies
+ * stay in memory only and are never written to disk.
+ */
+function osSecrets() {
+  const { safeStorage } = require('electron');
+  try {
+    if (!safeStorage.isEncryptionAvailable()) return null;
+    if (process.platform === 'linux' && ['basic_text', 'unknown'].includes(safeStorage.getSelectedStorageBackend())) return null;
+  } catch {
+    return null;
+  }
+  return {
+    encrypt: (text) => safeStorage.encryptString(text).toString('base64'),
+    decrypt: (b64) => safeStorage.decryptString(Buffer.from(b64, 'base64')),
+  };
 }
 
 function quit() {

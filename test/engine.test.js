@@ -368,3 +368,44 @@ test('queues download one file at a time by default', async () => {
   s5.server.close();
   await m.shutdown();
 });
+
+test('browser cookies are never saved as plain text', async () => {
+  const COOKIE = 'session=SECRET-123; theme=dark';
+  const secrets = { encrypt: (t) => 'enc:' + Buffer.from(t).toString('base64'), decrypt: (s) => Buffer.from(s.slice(4), 'base64').toString() };
+  const dir = fs.mkdtempSync(path.join(tmp, 'c-'));
+  const settings = { downloadDir: dir, categorize: false, connections: 2, maxRetries: 1, speedLimit: 0 };
+  const file = path.join(dir, 'downloads.json');
+
+  const m = new Manager({ file, getSettings: () => settings, secrets });
+  const dl = m.add({ url: 'http://127.0.0.1:9/a.bin', cookies: COOKIE, mode: 'paused' });
+  m.saveNow();
+  const disk = fs.readFileSync(file, 'utf8');
+  assert.ok(!disk.includes('SECRET-123'), 'not readable in downloads.json');
+  assert.ok(disk.includes('cookiesEnc'));
+  const m2 = new Manager({ file, getSettings: () => settings, secrets });
+  m2.load();
+  assert.strictEqual(m2.get(dl.id).d.cookies, COOKIE, 'restored after a restart');
+
+  // no OS key store: kept in memory only
+  const m3 = new Manager({ file: path.join(dir, 'plain.json'), getSettings: () => settings });
+  m3.add({ url: 'http://127.0.0.1:9/b.bin', cookies: COOKIE, mode: 'paused' });
+  m3.saveNow();
+  assert.ok(!fs.readFileSync(path.join(dir, 'plain.json'), 'utf8').includes('SECRET'));
+
+  // a file written by an older version is re-saved protected right away
+  const old = path.join(dir, 'old.json');
+  fs.writeFileSync(old, JSON.stringify([{ id: 'x', url: 'http://127.0.0.1:9/c.bin', filename: 'c.bin', dir, savePath: path.join(dir, 'c.bin'), status: 'paused', size: -1, segments: [], cookies: COOKIE }]));
+  const m4 = new Manager({ file: old, getSettings: () => settings, secrets });
+  m4.load();
+  assert.ok(!fs.readFileSync(old, 'utf8').includes('SECRET'));
+  assert.strictEqual(m4.get('x').d.cookies, COOKIE);
+});
+
+test('cookies are dropped once a download has finished', async () => {
+  const { m } = makeManager({ connections: 2 });
+  const dl = m.add({ url: `${srv.base}/file/c.bin`, cookies: 'session=abc', mode: 'now' });
+  await waitFor(dl);
+  assert.strictEqual(dl.d.status, 'completed', dl.d.error);
+  assert.strictEqual(dl.d.cookies, '');
+  await m.shutdown();
+});

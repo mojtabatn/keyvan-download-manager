@@ -3,20 +3,31 @@
 const http = require('http');
 
 const PORT = 17842;
-const EXT_ORIGIN = /^(chrome|moz|edge|safari-web)-extension:\/\//;
+/**
+ * Only KDM's own extension may talk to the app. Its ID is fixed by the "key" in
+ * extension/manifest.json (the same on every computer); add the Chrome Web Store / Edge Add-ons
+ * IDs here once the extension is published there.
+ */
+const EXTENSION_IDS = ['dkjdefoooidmkpekcnlllfichlmokncd'];
+const ALLOWED_ORIGINS = new Set(EXTENSION_IDS.flatMap((id) => [`chrome-extension://${id}`, `extension://${id}`]));
 
 /**
  * Local bridge for the browser extension (127.0.0.1 only).
  *   GET  /ping       -> { app, version, enabled }
  *   POST /download   -> { url | urls[], filename?, referrer?, cookies?, userAgent?, size? }
- * Requests from web pages are refused (they always carry an http(s) Origin),
- * and the Host header is checked to block DNS-rebinding.
+ * Only requests from KDM's own browser extension are accepted (see ALLOWED_ORIGINS).
  */
 function startIntegrationServer({ version, isEnabled, onDownload, extra = () => ({}) }) {
   const server = http.createServer((req, res) => {
     const origin = req.headers.origin || '';
     const host = String(req.headers.host || '');
-    if (!/^(127\.0\.0\.1|localhost):\d+$/.test(host) || (origin && !EXT_ORIGIN.test(origin))) {
+    // Only KDM's extension may send downloads: browsers always attach the extension's Origin to a
+    // POST, and no web page or other extension can fake it. A plain GET /ping ("is KDM running?",
+    // nothing private) arrives without an Origin from extensions and is allowed; any request that
+    // does carry a foreign Origin (a web page, another extension) is refused. The Host check blocks
+    // DNS rebinding.
+    const pingOnly = req.method === 'GET' && req.url === '/ping' && !origin;
+    if (!/^(127\.0\.0\.1|localhost):\d+$/.test(host) || !(ALLOWED_ORIGINS.has(origin) || pingOnly)) {
       res.writeHead(403);
       return res.end();
     }
@@ -84,4 +95,4 @@ function startIntegrationServer({ version, isEnabled, onDownload, extra = () => 
   return server;
 }
 
-module.exports = { startIntegrationServer, PORT };
+module.exports = { startIntegrationServer, PORT, EXTENSION_IDS };

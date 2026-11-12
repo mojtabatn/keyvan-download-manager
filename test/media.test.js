@@ -191,24 +191,57 @@ test('media downloads survive a restart and run in the queue', async () => {
   await m2.shutdown();
 });
 
-test('component installer downloads and unpacks the helpers', async () => {
+test('component installer checks the files before using them', async () => {
   const exe = Buffer.from('#!/bin/sh\necho 2026.11.01\n');
-  const ff = Buffer.alloc(300_000, 3);
+  const ffgz = zlib.gzipSync(Buffer.alloc(300_000, 3));
+  const sha = (b) => require('crypto').createHash('sha256').update(b).digest('hex');
+  let tamper = false;
   const srv = http.createServer((req, res) => {
-    const body = req.url === '/yt' ? exe : zlib.gzipSync(ff);
-    res.writeHead(200, { 'Content-Length': body.length });
-    res.end(body);
+    if (req.url === '/yt/releases/latest') {
+      res.writeHead(302, { Location: '/yt/releases/tag/2026.11.01' });
+      return res.end();
+    }
+    if (req.url === '/yt/releases/tag/2026.11.01') return res.end('<html>release page</html>');
+    if (req.url === '/yt/releases/download/2026.11.01/SHA2-256SUMS') return res.end(`${'0'.repeat(64)}  yt-dlp.exe\n${sha(exe)}  yt-dlp_linux\n`);
+    if (req.url === '/yt/releases/download/2026.11.01/yt-dlp_linux') return res.end(tamper ? Buffer.from('#!/bin/sh\necho evil\n') : exe);
+    if (req.url === '/ff.gz') return res.end(ffgz);
+    res.writeHead(404);
+    res.end();
   });
   await new Promise((r) => srv.listen(0, '127.0.0.1', r));
   const base = `http://127.0.0.1:${srv.address().port}`;
+  const sources = () => ({
+    ytdlp: { latest: `${base}/yt/releases`, asset: 'yt-dlp_linux', file: 'yt-dlp', sums: 'SHA2-256SUMS' },
+    ffmpeg: { url: `${base}/ff.gz`, sha256: sha(ffgz), file: 'ffmpeg', gz: true },
+  });
+
   const dir = path.join(tmp, 'bin');
-  const c = new Components(dir, 'linux', { ytdlp: { url: `${base}/yt`, file: 'yt-dlp' }, ffmpeg: { url: `${base}/ff`, file: 'ffmpeg', gz: true } });
+  const c = new Components(dir, 'linux', sources());
   assert.strictEqual((await c.status()).ready, false);
   let progress = 0;
   const st = await c.install((p) => (progress = p.received));
   assert.strictEqual(st.ready, true);
   assert.ok(progress > 0);
-  assert.ok(fs.readFileSync(path.join(dir, 'ffmpeg')).equals(ff), 'ffmpeg gunzipped');
+  assert.ok(fs.readFileSync(path.join(dir, 'ffmpeg')).equals(zlib.gunzipSync(ffgz)), 'ffmpeg gunzipped');
+  assert.ok(fs.readFileSync(path.join(dir, 'yt-dlp')).equals(exe));
   assert.ok(fs.statSync(path.join(dir, 'yt-dlp')).mode & 0o100, 'executable');
+
+  // a file that doesn't match its published checksum is deleted, never kept
+  tamper = true;
+  const dir2 = path.join(tmp, 'bin2');
+  await assert.rejects(new Components(dir2, 'linux', sources()).install(), /integrity check/);
+  assert.ok(!fs.existsSync(path.join(dir2, 'yt-dlp')) && !fs.existsSync(path.join(dir2, 'yt-dlp.download')));
+  const bad = { ...sources(), ytdlp: undefined };
+  bad.ffmpeg.sha256 = 'f'.repeat(64);
+  delete bad.ytdlp;
+  await assert.rejects(new Components(path.join(tmp, 'bin3'), 'linux', { ytdlp: sources().ytdlp, ffmpeg: bad.ffmpeg }).install(), /integrity check/);
   srv.close();
+});
+
+test('every built-in ffmpeg download has a pinned checksum', () => {
+  const { SOURCES } = require('../src/main/media/components');
+  for (const [os, s] of Object.entries(SOURCES)) {
+    assert.match(s.ffmpeg.sha256, /^[0-9a-f]{64}$/, os);
+    assert.ok(s.ytdlp.latest && s.ytdlp.sums, os);
+  }
 });

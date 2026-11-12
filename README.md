@@ -202,6 +202,17 @@ The UI uses the **Manrope** font (bundled, SIL Open Font License), so it looks t
    Publishing a release by hand on GitHub works too.
 3. Installed copies of KDM find it within a few hours, or right away with **Settings → About → Check now**.
 
+## Privacy and security
+
+- KDM has no accounts, ads or tracking, and sends nothing anywhere except the downloads you start and its update check
+  on GitHub.
+- Browser cookies (needed to download from sites you're signed in to) are kept only for unfinished downloads,
+  encrypted by your operating system (Windows DPAPI / macOS Keychain), and deleted when the download finishes.
+- The app only accepts downloads from KDM's own browser extension; web pages and other extensions are refused.
+- yt-dlp and ffmpeg are checked against published SHA-256 checksums before they are used.
+- The installers aren't code-signed yet (that needs a paid certificate), so Windows and macOS show a warning the first
+  time. You can always build KDM yourself from this source code.
+
 ## Author
 
 **Mojtaba Navade** · [Telegram](https://t.me/mojtabatn) · [Instagram](https://www.instagram.com/mojtabanavade)
