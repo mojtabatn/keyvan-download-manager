@@ -11,7 +11,7 @@ function defaults(downloadsDir) {
     downloadDir: downloadsDir,
     categorize: true, // sort into Video / Music / Compressed / Documents / Programs / General
     connections: 8, // connections per download
-    maxConcurrent: 3, // downloads at a time from the queue
+    maxConcurrent: 1, // downloads at a time from a queue: one after another
     speedLimit: 0, // KB/s, 0 = unlimited
     maxRetries: 10,
     listView: 'cards', // 'cards' (large icons) | 'compact' (list without icons)
@@ -52,7 +52,9 @@ class Settings {
     if (!THEME_IDS.includes(this.data.theme)) this.data.theme = 'light';
     // Older versions had one queue configured by `schedule` + `maxConcurrent`.
     if (!Array.isArray(this.data.queues) || !this.data.queues.length) {
-      this.data.queues = [{ id: 'main', name: 'Main queue', maxConcurrent: this.data.maxConcurrent, schedule: { ...this.data.schedule } }];
+      // 0.1.0 ran 3 queue items at once by default; queues now go one by one unless the user chose otherwise
+      const max = this.data.maxConcurrent === 3 ? 1 : this.data.maxConcurrent;
+      this.data.queues = [{ id: 'main', name: 'Main queue', maxConcurrent: max, schedule: { ...this.data.schedule } }];
     }
     this.data.queues = sanitizeQueues(this.data.queues, this.data);
   }
@@ -117,7 +119,7 @@ function sanitizeQueues(list, base = {}) {
     out.push({
       id,
       name: String(q.name || 'Queue').trim().slice(0, 40) || 'Queue',
-      maxConcurrent: clamp(q.maxConcurrent ?? base.maxConcurrent, 1, 20, 3),
+      maxConcurrent: clamp(q.maxConcurrent ?? base.maxConcurrent, 1, 20, 1),
       schedule: {
         enabled: !!s.enabled,
         startTime: TIME.test(s.startTime) ? s.startTime : def.startTime,
@@ -128,7 +130,7 @@ function sanitizeQueues(list, base = {}) {
       },
     });
   }
-  if (!out.some((q) => q.id === 'main')) out.unshift({ id: 'main', name: 'Main queue', maxConcurrent: clamp(base.maxConcurrent, 1, 20, 3), schedule: { ...def } });
+  if (!out.some((q) => q.id === 'main')) out.unshift({ id: 'main', name: 'Main queue', maxConcurrent: clamp(base.maxConcurrent, 1, 20, 1), schedule: { ...def } });
   else out.unshift(...out.splice(out.findIndex((q) => q.id === 'main'), 1));
   return out.slice(0, 20);
 }
@@ -137,7 +139,7 @@ function sanitizePatch(p) {
   const out = { ...p };
   if ('queues' in out) out.queues = sanitizeQueues(out.queues);
   if ('connections' in out) out.connections = clamp(out.connections, 1, 32, 8);
-  if ('maxConcurrent' in out) out.maxConcurrent = clamp(out.maxConcurrent, 1, 20, 3);
+  if ('maxConcurrent' in out) out.maxConcurrent = clamp(out.maxConcurrent, 1, 20, 1);
   if ('speedLimit' in out) out.speedLimit = clamp(out.speedLimit, 0, 10_000_000, 0);
   if ('maxRetries' in out) out.maxRetries = clamp(out.maxRetries, 0, 100, 10);
   if ('theme' in out && !THEME_IDS.includes(out.theme)) delete out.theme;

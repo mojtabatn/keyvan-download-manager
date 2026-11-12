@@ -346,3 +346,25 @@ test('old single-queue settings become the "Main queue"', () => {
   assert.deepStrictEqual(q2.map((x) => x.id), ['main', 'xy']);
   assert.deepStrictEqual([q2[1].name, q2[1].maxConcurrent, q2[1].schedule.startTime, q2[1].schedule.afterDone], ['Night', 20, '02:00', 'none']);
 });
+
+test('queues download one file at a time by default', async () => {
+  const { Settings } = require('../src/main/settings');
+  const dir = fs.mkdtempSync(path.join(tmp, 's1-'));
+  assert.strictEqual(new Settings(path.join(dir, 'fresh.json'), dir).get().queues[0].maxConcurrent, 1, 'new install');
+  fs.writeFileSync(path.join(dir, 'old.json'), JSON.stringify({ maxConcurrent: 3 }));
+  assert.strictEqual(new Settings(path.join(dir, 'old.json'), dir).get().queues[0].maxConcurrent, 1, '0.1.0 default (3) becomes 1');
+
+  const s5 = await startServer(makeData(512 * 1024, 6), { bytesPerSec: 1024 * 1024 });
+  const { m } = makeManager({ maxConcurrent: undefined, connections: 2 });
+  const dls = [1, 2, 3].map((i) => m.add({ url: `${s5.base}/file/one${i}.bin`, mode: 'queue' }));
+  let peak = 0;
+  const iv = setInterval(() => (peak = Math.max(peak, dls.filter((d) => d.running).length)), 10);
+  const done = new Promise((r) => m.once('queue-done', r));
+  m.startQueue();
+  await done;
+  clearInterval(iv);
+  assert.strictEqual(peak, 1, 'never more than one at once');
+  assert.ok(dls.every((d) => d.d.status === 'completed'));
+  s5.server.close();
+  await m.shutdown();
+});

@@ -355,7 +355,7 @@ class Manager extends EventEmitter {
     const s = this.getSettings();
     const list = Array.isArray(s.queues) && s.queues.length ? s.queues : [];
     if (list.some((q) => q.id === 'main')) return list;
-    return [{ id: 'main', name: 'Main queue', maxConcurrent: s.maxConcurrent || 3, schedule: s.schedule || {} }, ...list];
+    return [{ id: 'main', name: 'Main queue', maxConcurrent: s.maxConcurrent || 1, schedule: s.schedule || {} }, ...list];
   }
 
   queueIdOr(id) {
@@ -448,7 +448,7 @@ class Manager extends EventEmitter {
   pumpQueue(q) {
     const st = this.qstate(q.id);
     if (!st.running) return;
-    const max = Math.max(1, q.maxConcurrent || 3);
+    const max = Math.max(1, q.maxConcurrent || 1);
     const items = this.queueItems(q.id);
     let running = items.filter((d) => d.running).length;
     for (const d of items) {
