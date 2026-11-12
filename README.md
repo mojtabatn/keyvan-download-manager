@@ -78,6 +78,8 @@ download them now or add them to the queue.
 
 ### 🗓️ Download queue and scheduler
 
+- Create **as many queues as you like** (for example *Night downloads*), each with its own schedule, its own number of
+  downloads at a time and its own action when it finishes; right-click a download to move it to another queue
 - Put downloads in a queue and choose how many run **at a time**
 - **Start** and **stop** the queue at set times on chosen days, for example overnight when internet is cheaper
 - **When finished**: shut down, sleep, hibernate or close KDM, with a 60-second countdown you can cancel

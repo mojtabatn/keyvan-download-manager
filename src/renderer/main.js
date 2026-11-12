@@ -20,6 +20,8 @@ const IS_MAC = document.documentElement.dataset.platform === 'mac';
     anchor: null, // start of a Shift+click range
     settings: null,
     queueRunning: false,
+    queue: 'main', // queue shown in the Scheduled view
+    queueStates: {}, // queue id -> running
     listView: 'cards', // 'cards' (large icons) | 'compact' (list with small icons)
   };
   const rows = new Map(); // id -> { row, divider, parts }
@@ -38,6 +40,7 @@ const IS_MAC = document.documentElement.dataset.platform === 'mac';
     state.settings = settings;
     state.listView = settings.listView || 'cards';
     state.queueRunning = q.running;
+    state.queueStates = q.queues || {};
     for (const d of list) state.items.set(d.id, d);
     renderViewSwitch();
     renderAll();
@@ -74,10 +77,12 @@ const IS_MAC = document.documentElement.dataset.platform === 'mac';
   });
   api.on('queue:state', (q) => {
     state.queueRunning = q.running;
+    state.queueStates = q.queues || {};
     renderQueuePanel();
     updateActions();
   });
   api.on('settings:changed', (s) => {
+    if (!(s.queues || []).some((q) => q.id === state.queue)) state.queue = 'main'; // that queue was deleted
     state.settings = s;
     if ((s.listView || 'cards') !== state.listView) {
       state.listView = s.listView || 'cards';
@@ -104,7 +109,7 @@ const IS_MAC = document.documentElement.dataset.platform === 'mac';
     const q = state.query.toLowerCase();
     let arr = [...state.items.values()];
     if (state.view === 'completed') arr = arr.filter((d) => d.status === 'completed');
-    if (state.view === 'scheduled') arr = arr.filter((d) => d.queued && d.status !== 'completed');
+    if (state.view === 'scheduled') arr = arr.filter((d) => d.queued && d.status !== 'completed' && (d.queueId || 'main') === state.queue);
     if (q) arr = arr.filter((d) => d.filename.toLowerCase().includes(q) || d.url.toLowerCase().includes(q));
     if (state.view === 'scheduled') arr.sort((a, b) => a.queueOrder - b.queueOrder);
     else arr.sort((a, b) => b.createdAt - a.createdAt);
@@ -504,17 +509,99 @@ const IS_MAC = document.documentElement.dataset.platform === 'mac';
   const maxSel = $('schMax');
   for (let i = 1; i <= 10; i++) maxSel.append(el('option', { value: String(i), text: String(i) }));
 
+  const queues = () => (state.settings && state.settings.queues) || [];
+  const currentQueue = () => queues().find((q) => q.id === state.queue) || queues()[0];
+  const queueCount = (id) => [...state.items.values()].filter((d) => d.queued && d.status !== 'completed' && (d.queueId || 'main') === id).length;
+  let editing = null; // id of the queue tab being renamed
+
+  function renderQueueTabs() {
+    const tabs = queues().map((q) => {
+      const n = queueCount(q.id);
+      const tab = el('button', { class: `q-tab${q.id === state.queue ? ' on' : ''}`, title: q.name });
+      tab.dataset.id = q.id;
+      if (editing === q.id) {
+        const input = el('input', { value: q.name, maxlength: '40', spellcheck: 'false' });
+        const finish = (save) => {
+          if (editing !== q.id) return;
+          editing = null;
+          const name = input.value.trim();
+          if (save && name && name !== q.name) saveQueue(q.id, { name });
+          else renderQueuePanel();
+        };
+        input.addEventListener('keydown', (e) => {
+          e.stopPropagation();
+          if (e.key === 'Enter') finish(true);
+          if (e.key === 'Escape') finish(false);
+        });
+        input.addEventListener('blur', () => finish(true));
+        tab.append(input);
+        setTimeout(() => {
+          input.focus();
+          input.select();
+        });
+      } else {
+        if (state.queueStates[q.id]) tab.append(el('i', { class: 'q-dot', title: 'Running' }));
+        tab.append(el('span', { class: 'q-name', text: q.name }));
+        tab.append(el('span', { class: 'q-count', text: n ? String(n) : '' }));
+        tab.addEventListener('click', () => {
+          if (state.queue === q.id) return;
+          state.queue = q.id;
+          select(null);
+          renderQueuePanel();
+          renderAll();
+        });
+        tab.addEventListener('dblclick', () => startRename(q.id));
+      }
+      return tab;
+    });
+    const add = el('button', { class: 'q-add', title: 'Create another queue with its own schedule', onclick: () => newQueue() });
+    add.innerHTML = '<svg viewBox="0 0 12 12" fill="none"><path d="M6 1.5v9M1.5 6h9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
+    add.append(document.createTextNode('New queue'));
+    $('queueTabs').replaceChildren(...tabs, add);
+  }
+
+  function startRename(id) {
+    editing = id;
+    renderQueueTabs();
+  }
+
+  function newQueue() {
+    const list = queues();
+    let n = list.length + 1;
+    while (list.some((q) => q.name === `Queue ${n}`)) n++;
+    const id = `q${Date.now().toString(36)}`;
+    const base = currentQueue() || {};
+    const q = { id, name: `Queue ${n}`, maxConcurrent: base.maxConcurrent || 3, schedule: { enabled: false, startTime: '02:00', stopEnabled: false, stopTime: '08:00', days: [0, 1, 2, 3, 4, 5, 6], afterDone: 'none' } };
+    state.queue = id;
+    editing = id;
+    select(null);
+    renderAll(); // the new queue is empty
+    api.invoke('settings:set', { queues: [...list, q] });
+  }
+
+  function saveQueue(id, patch) {
+    const list = queues().map((q) => (q.id === id ? { ...q, ...patch, schedule: { ...q.schedule, ...(patch.schedule || {}) } } : q));
+    return api.invoke('settings:set', { queues: list });
+  }
+
   function renderQueuePanel() {
     const s = state.settings;
     if (!s) return;
-    const sch = s.schedule;
-    $('queueStart').hidden = state.queueRunning;
-    $('queueStop').hidden = !state.queueRunning;
+    const q = currentQueue();
+    if (!q) return;
+    renderQueueTabs();
+    const sch = q.schedule;
+    const running = !!state.queueStates[q.id];
+    $('queueStart').hidden = running;
+    $('queueStop').hidden = !running;
+    $('queueStart').querySelector('span').textContent = queues().length > 1 ? `Start “${q.name}”` : 'Start queue';
+    $('queueStop').querySelector('span').textContent = queues().length > 1 ? `Stop “${q.name}”` : 'Stop queue';
+    $('queueDelete').hidden = q.id === 'main';
     $('schEnabled').checked = sch.enabled;
     $('schStart').value = sch.startTime;
     $('schStopEnabled').checked = sch.stopEnabled;
     $('schStop').value = sch.stopTime;
-    $('schMax').value = String(s.maxConcurrent);
+    $('schMax').value = String(q.maxConcurrent);
     $('schAfter').value = sch.afterDone;
     const days = $('schDays');
     days.replaceChildren(
@@ -524,7 +611,7 @@ const IS_MAC = document.documentElement.dataset.platform === 'mac';
           text: d,
           title: DAY_FULL[i],
           onclick: () => {
-            const set = new Set(state.settings.schedule.days);
+            const set = new Set(currentQueue().schedule.days);
             set.has(i) ? set.delete(i) : set.add(i);
             saveSchedule({ days: [...set].sort() });
           },
@@ -535,26 +622,42 @@ const IS_MAC = document.documentElement.dataset.platform === 'mac';
   }
 
   function updateQueueStatus() {
-    const q = [...state.items.values()].filter((d) => d.queued && d.status !== 'completed');
-    const running = q.filter((d) => ['downloading', 'connecting'].includes(d.status)).length;
-    const sch = state.settings?.schedule;
+    const cur = currentQueue();
+    if (!cur) return;
+    const q = [...state.items.values()].filter((d) => d.queued && d.status !== 'completed' && (d.queueId || 'main') === cur.id);
+    const active = q.filter((d) => ['downloading', 'connecting'].includes(d.status)).length;
+    const running = !!state.queueStates[cur.id];
+    const sch = cur.schedule;
     let text;
-    if (state.queueRunning) text = `Running · ${running} active, ${q.length - running} waiting`;
+    if (running) text = `Running · ${active} active, ${q.length - active} waiting`;
     else if (!q.length) text = 'Queue is empty';
     else text = `${q.length} waiting`;
-    if (!state.queueRunning && sch?.enabled) text += ` · starts at ${sch.startTime}`;
+    if (!running && sch.enabled) text += ` · starts at ${sch.startTime}`;
     $('queueStatus').textContent = text;
+    // counts on the tabs follow the list
+    for (const tab of $('queueTabs').querySelectorAll('.q-tab')) {
+      const c = tab.querySelector('.q-count');
+      if (c) c.textContent = String(queueCount(tab.dataset.id) || '');
+    }
   }
 
-  const saveSchedule = (patch) => api.invoke('settings:set', { schedule: patch });
-  $('queueStart').addEventListener('click', () => api.invoke('queue:start'));
-  $('queueStop').addEventListener('click', () => api.invoke('queue:stop'));
+  const saveSchedule = (patch) => saveQueue(state.queue, { schedule: patch });
+  $('queueStart').addEventListener('click', () => api.invoke('queue:start', state.queue));
+  $('queueStop').addEventListener('click', () => api.invoke('queue:stop', state.queue));
+  $('queueRename').addEventListener('click', () => startRename(state.queue));
+  $('queueDelete').addEventListener('click', async () => {
+    if (await api.invoke('queue:delete', state.queue)) {
+      state.queue = 'main';
+      renderQueuePanel();
+      renderAll();
+    }
+  });
   $('schEnabled').addEventListener('change', (e) => saveSchedule({ enabled: e.target.checked }));
   $('schStopEnabled').addEventListener('change', (e) => saveSchedule({ stopEnabled: e.target.checked }));
   $('schStart').addEventListener('change', (e) => e.target.value && saveSchedule({ startTime: e.target.value }));
   $('schStop').addEventListener('change', (e) => e.target.value && saveSchedule({ stopTime: e.target.value }));
   $('schAfter').addEventListener('change', (e) => saveSchedule({ afterDone: e.target.value }));
-  $('schMax').addEventListener('change', (e) => api.invoke('settings:set', { maxConcurrent: Number(e.target.value) }));
+  $('schMax').addEventListener('change', (e) => saveQueue(state.queue, { maxConcurrent: Number(e.target.value) }));
 
   // ------------------------------------------------------------ power banner
   function showPower(p) {

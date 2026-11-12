@@ -267,8 +267,9 @@ function wireManagerEvents() {
     windows.broadcast('queue:state', q);
     refreshTrayMenu();
   });
-  manager.on('queue-done', () => {
-    const action = settings.get().schedule.afterDone;
+  manager.on('queue-done', ({ id } = {}) => {
+    const q = manager.queues().find((x) => x.id === id) || {};
+    const action = (q.schedule || {}).afterDone;
     if (action && action !== 'none') power.schedule(action);
   });
   manager.on('completed', (s) => {
@@ -371,6 +372,13 @@ function createTray() {
   refreshTrayMenu();
 }
 
+function queueTrayItems() {
+  const queues = manager.queues();
+  const item = (q, label) => (manager.qstate(q.id).running ? { label: `Stop ${label}`, click: () => manager.stopQueue(q.id) } : { label: `Start ${label}`, click: () => manager.startQueue(q.id) });
+  if (queues.length === 1) return [item(queues[0], 'queue')];
+  return [{ label: 'Queues', submenu: queues.map((q) => item(q, `“${q.name}”`)) }];
+}
+
 function refreshTrayMenu() {
   if (!tray) return;
   const items = [
@@ -379,7 +387,7 @@ function refreshTrayMenu() {
     { type: 'separator' },
     { label: 'Pause all', click: () => manager.pauseAll() },
     { label: 'Resume all', click: () => manager.resumeAll() },
-    manager.queueRunning ? { label: 'Stop queue', click: () => manager.stopQueue() } : { label: 'Start queue', click: () => manager.startQueue() },
+    ...queueTrayItems(),
   ];
   if (power && power.pending) items.push({ type: 'separator' }, { label: `Cancel ${power.pending.action}`, click: () => power.cancel() });
   items.push({ type: 'separator' }, { label: 'Quit', click: () => quit() });
@@ -403,6 +411,13 @@ function onSettingsChanged(s, prev) {
   if (s.autoUpdate !== prev.autoUpdate) startUpdater();
   if (s.preventSleep !== prev.preventSleep) updateSleepBlocker(lastActivity.active > 0);
   windows.broadcast('settings:changed', s);
+  // after the windows have the new settings, so they know every queue that is reported
+  if (JSON.stringify(s.queues) !== JSON.stringify(prev.queues)) {
+    // a queue was added / renamed / deleted or its "at a time" changed
+    manager.pump();
+    manager.emitQueue();
+    refreshTrayMenu();
+  }
 }
 
 // ---------------------------------------------------------------- external players
@@ -574,7 +589,8 @@ async function runAction(win, { id, action, value }) {
       await manager.refreshUrl(id, String(value || ''));
       break;
     case 'queue':
-      manager.setQueued(id, !!value);
+      // value: a queue id, true (main queue) or false (leave the queue)
+      manager.setQueued(id, !!value, typeof value === 'string' ? value : 'main');
       break;
     case 'moveUp':
       manager.moveInQueue(id, 'up');
@@ -622,7 +638,16 @@ function contextMenuFor(win, id) {
     else tpl.push({ label: s.status === 'error' ? 'Retry' : 'Resume', click: act('start') });
     if (s.status === 'canceled') tpl.push({ label: 'Restart from beginning', click: act('redownload') });
     tpl.push({ label: 'Show progress window', click: act('progress') });
-    tpl.push({ label: s.queued ? 'Remove from queue' : 'Add to queue', click: act('queue', !s.queued) });
+    const queues = manager.queues();
+    if (queues.length === 1) tpl.push({ label: s.queued ? 'Remove from queue' : 'Add to queue', click: act('queue', s.queued ? false : 'main') });
+    else {
+      const current = s.queued ? s.queueId || 'main' : null;
+      tpl.push({
+        label: s.queued ? 'Move to queue' : 'Add to queue',
+        submenu: queues.map((q) => ({ label: q.name, type: 'radio', checked: q.id === current, click: act('queue', q.id) })),
+      });
+      if (s.queued) tpl.push({ label: 'Remove from queue', click: act('queue', false) });
+    }
     if (s.queued) tpl.push({ label: 'Move up in queue', click: act('moveUp') }, { label: 'Move down in queue', click: act('moveDown') });
     tpl.push({ type: 'separator' });
   }
@@ -670,9 +695,46 @@ function registerIpc() {
   h('downloads:pauseAll', () => manager.pauseAll());
   h('downloads:resumeAll', () => manager.resumeAll());
 
-  h('queue:start', () => manager.startQueue());
-  h('queue:stop', () => manager.stopQueue());
-  h('queue:state', () => ({ running: manager.queueRunning }));
+  h('queue:start', (_e, id) => manager.startQueue(manager.queueIdOr(id)));
+  h('queue:stop', (_e, id) => manager.stopQueue(manager.queueIdOr(id)));
+  h('queue:state', () => manager.queueState());
+  h('queue:delete', async (e, id) => {
+    const q = manager.queues().find((x) => x.id === id);
+    if (!q || id === 'main') return false;
+    const n = manager.queueItems(id).length;
+    const main = manager.queues()[0];
+    const { response } = await dialog.showMessageBox(senderWindow(e), {
+      type: 'question',
+      buttons: ['Delete queue', 'Cancel'],
+      defaultId: 1,
+      cancelId: 1,
+      noLink: true,
+      title: 'Keyvan Download Manager',
+      message: `Delete the queue “${q.name}”?`,
+      detail: n ? `Its ${n} download${n > 1 ? 's' : ''} will move to “${main.name}”. Nothing is deleted from your disk.` : 'The queue is empty.',
+    });
+    if (response !== 0) return false;
+    await manager.deleteQueue(id);
+    settings.set({ queues: settings.get().queues.filter((q) => q.id !== id) });
+    return true;
+  });
+  /** "Download Later" with several queues: a menu to pick one. Resolves the queue id, or null if dismissed. */
+  h('queue:pick', (e) => {
+    const queues = manager.queues();
+    if (queues.length < 2) return 'main';
+    return new Promise((resolve) => {
+      let picked = null;
+      const menu = Menu.buildFromTemplate([
+        { label: 'Add to queue', enabled: false },
+        ...queues.map((q) => ({ label: q.name, click: () => (picked = q.id) })),
+      ]);
+      menu.popup({ window: senderWindow(e), callback: () => setTimeout(() => resolve(picked), 0) });
+    });
+  });
+  h('queue:move', (_e, { ids, queueId } = {}) => {
+    for (const id of Array.isArray(ids) ? ids : []) manager.setQueued(id, true, queueId);
+    return true;
+  });
 
   h('dialog:open', (_e, q) => (q && q.mode === 'add' ? openAddDialog(q) : windows.openDialog(q || { mode: 'add' })) && true);
   h('dialog:payload', (_e, token) => {

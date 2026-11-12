@@ -14,11 +14,11 @@ const TICK_MS = 500;
 const DAY_KEYS = [0, 1, 2, 3, 4, 5, 6];
 
 /**
- * Owns every download, the main queue ("Scheduled"), the scheduler and the
+ * Owns every download, the queues ("Scheduled"; each with its own schedule), the scheduler and the
  * on-disk list. Emits:
  *   'added' (snapshot) · 'changed' (snapshot) · 'removed' (id)
  *   'progress' (snapshots of running items) · 'completed' (snapshot)
- *   'failed' (snapshot) · 'queue' ({ running }) · 'queue-done'
+ *   'failed' (snapshot) · 'queue' ({ running, queues: { id: running } }) · 'queue-done' ({ id, failed })
  *   'activity' ({ active, speed, progress })
  */
 class Manager extends EventEmitter {
@@ -27,9 +27,8 @@ class Manager extends EventEmitter {
     this.file = file;
     this.getSettings = getSettings;
     this.items = new Map();
-    this.queueRunning = false;
-    this.queueStartedToday = null;
-    this.queueStoppedToday = null;
+    // per queue: { running, runCount, startedToday, stoppedToday }
+    this.qrun = new Map();
     this.throttle = new Throttle(((getSettings().speedLimit || 0) * 1024) | 0);
     this.ctx = {
       throttle: this.throttle,
@@ -181,6 +180,7 @@ class Manager extends EventEmitter {
     const dir = opts.dir || this.folderFor(filename);
     const savePath = uniquePath(dir, filename, this.takenPaths());
     const queued = opts.mode === 'queue';
+    const queueId = queued ? this.queueIdOr(opts.queueId) : null;
     const maxOrder = Math.max(0, ...[...this.items.values()].map((d) => d.d.queueOrder || 0));
     const dl = new Download(
       {
@@ -200,6 +200,7 @@ class Manager extends EventEmitter {
         category: categoryOf(filename),
         createdAt: Date.now(),
         queued,
+        queueId,
         queueOrder: queued ? maxOrder + 1 : 0,
         addedFrom: opts.source || 'manual',
       },
@@ -225,6 +226,7 @@ class Manager extends EventEmitter {
     const dir = opts.dir || (s.categorize ? path.join(s.downloadDir, CATEGORIES[category].folder) : s.downloadDir);
     const savePath = mediaTarget(dir, opts.title || 'video', ext, this.takenPaths());
     const queued = opts.mode === 'queue';
+    const queueId = queued ? this.queueIdOr(opts.queueId) : null;
     const maxOrder = Math.max(0, ...[...this.items.values()].map((d) => d.d.queueOrder || 0));
     const dl = new MediaDownload(
       {
@@ -248,6 +250,7 @@ class Manager extends EventEmitter {
         category,
         createdAt: Date.now(),
         queued,
+        queueId,
         queueOrder: queued ? maxOrder + 1 : 0,
         addedFrom: opts.source || 'manual',
       },
@@ -285,7 +288,7 @@ class Manager extends EventEmitter {
   async cancel(id) {
     const d = this.items.get(id);
     if (!d || d.d.status === 'completed') return;
-    if (d.d.queued) d.update({ queued: false, queueOrder: 0 });
+    if (d.d.queued) d.update({ queued: false, queueId: null, queueOrder: 0 });
     await d.stop('cancel');
   }
 
@@ -337,27 +340,66 @@ class Manager extends EventEmitter {
 
   async pauseAll() {
     await Promise.all([...this.items.values()].filter((d) => d.running || d.d.status === 'queued').map((d) => d.stop('pause')));
-    this.queueRunning = false;
-    this.emit('queue', { running: false });
+    for (const st of this.qrun.values()) st.running = false;
+    this.emitQueue();
   }
 
   resumeAll() {
     for (const d of this.items.values()) if (['paused', 'error'].includes(d.d.status) && !d.d.queued) this.start(d.id);
-    if ([...this.items.values()].some((d) => d.d.queued && d.d.status !== 'completed')) this.startQueue();
+    for (const q of this.queues()) if (this.queueItems(q.id).length) this.startQueue(q.id);
   }
 
-  setQueued(id, queued) {
+  // ---------- queues ----------
+  /** Queue definitions from the settings ({ id, name, maxConcurrent, schedule }); "main" always exists. */
+  queues() {
+    const s = this.getSettings();
+    const list = Array.isArray(s.queues) && s.queues.length ? s.queues : [];
+    if (list.some((q) => q.id === 'main')) return list;
+    return [{ id: 'main', name: 'Main queue', maxConcurrent: s.maxConcurrent || 3, schedule: s.schedule || {} }, ...list];
+  }
+
+  queueIdOr(id) {
+    return this.queues().some((q) => q.id === id) ? id : 'main';
+  }
+
+  qstate(id) {
+    if (!this.qrun.has(id)) this.qrun.set(id, { running: false, runCount: 0, startedToday: null, stoppedToday: null });
+    return this.qrun.get(id);
+  }
+
+  /** True while any queue is running (tray, "Stop all"). */
+  get queueRunning() {
+    return [...this.qrun.values()].some((q) => q.running);
+  }
+
+  queueState() {
+    const queues = {};
+    for (const q of this.queues()) queues[q.id] = this.qstate(q.id).running;
+    return { running: this.queueRunning, queues };
+  }
+
+  emitQueue() {
+    this.emit('queue', this.queueState());
+  }
+
+  /** Puts a download into a queue (queueId) or takes it out (queued = false). */
+  setQueued(id, queued, queueId = 'main') {
     const d = this.items.get(id);
     if (!d) return;
     const maxOrder = Math.max(0, ...[...this.items.values()].map((x) => x.d.queueOrder || 0));
-    d.update({ queued: !!queued, queueOrder: queued ? maxOrder + 1 : 0 });
+    const qid = queued ? this.queueIdOr(queueId) : null;
+    const same = queued && d.d.queued && (d.d.queueId || 'main') === qid;
+    d.update({ queued: !!queued, queueId: qid, queueOrder: queued ? (same ? d.d.queueOrder : maxOrder + 1) : 0 });
     if (queued && !d.running && d.d.status !== 'completed') d.setStatus('queued');
     if (!queued && d.d.status === 'queued') d.setStatus('paused');
+    // a running download moved to a stopped queue keeps going; the queues just re-balance
     this.pump();
   }
 
   moveInQueue(id, dir) {
-    const q = this.queueItems();
+    const item = this.items.get(id);
+    if (!item) return;
+    const q = this.queueItems(item.d.queueId || 'main');
     const i = q.findIndex((d) => d.id === id);
     const j = i + (dir === 'up' ? -1 : 1);
     if (i < 0 || j < 0 || j >= q.length) return;
@@ -366,46 +408,65 @@ class Manager extends EventEmitter {
     q[j].update({ queueOrder: a });
   }
 
-  queueItems() {
-    return [...this.items.values()].filter((d) => d.d.queued && d.d.status !== 'completed').sort((a, b) => a.d.queueOrder - b.d.queueOrder);
+  /** Waiting / running items of one queue (all queues when id is omitted), in queue order. */
+  queueItems(id) {
+    return [...this.items.values()]
+      .filter((d) => d.d.queued && d.d.status !== 'completed' && (id === undefined || (d.d.queueId || 'main') === id))
+      .sort((a, b) => a.d.queueOrder - b.d.queueOrder);
   }
 
-  startQueue() {
-    this.queueRunning = true;
-    this.queueRunCount = 0;
-    for (const d of this.queueItems()) if (['paused', 'error'].includes(d.d.status) && !d.running) d.setStatus('queued');
-    this.emit('queue', { running: true });
+  startQueue(id = 'main') {
+    const st = this.qstate(id);
+    st.running = true;
+    st.runCount = 0;
+    for (const d of this.queueItems(id)) if (['paused', 'error'].includes(d.d.status) && !d.running) d.setStatus('queued');
+    this.emitQueue();
     this.pump();
   }
 
-  async stopQueue() {
-    this.queueRunning = false;
-    this.emit('queue', { running: false });
-    await Promise.all(this.queueItems().filter((d) => d.running).map((d) => d.stop('queue')));
+  async stopQueue(id = 'main') {
+    this.qstate(id).running = false;
+    this.emitQueue();
+    await Promise.all(this.queueItems(id).filter((d) => d.running).map((d) => d.stop('queue')));
   }
 
-  /** Starts waiting queue items until "max downloads at a time" is reached. */
+  /** Removes a queue; its downloads move to the main queue. */
+  async deleteQueue(id) {
+    if (id === 'main') return;
+    const wasRunning = this.qstate(id).running;
+    this.qrun.delete(id);
+    for (const d of this.queueItems(id)) d.update({ queueId: 'main' });
+    if (wasRunning) this.startQueue('main');
+    else this.emitQueue();
+  }
+
+  /** Starts waiting items of every running queue, up to that queue's "at a time". */
   pump() {
-    if (!this.queueRunning) return;
-    const max = Math.max(1, this.getSettings().maxConcurrent || 3);
-    const q = this.queueItems();
-    let running = q.filter((d) => d.running).length;
-    for (const d of q) {
+    for (const q of this.queues()) this.pumpQueue(q);
+  }
+
+  pumpQueue(q) {
+    const st = this.qstate(q.id);
+    if (!st.running) return;
+    const max = Math.max(1, q.maxConcurrent || 3);
+    const items = this.queueItems(q.id);
+    let running = items.filter((d) => d.running).length;
+    for (const d of items) {
       if (running >= max) break;
       if (!d.running && d.d.status === 'queued') {
         d.start();
-        this.queueRunCount++;
+        st.runCount++;
         running++;
       }
     }
-    const rest = this.queueItems();
+    const rest = this.queueItems(q.id);
     if (rest.some((d) => d.running || d.d.status === 'queued')) return;
-    this.queueRunning = false;
-    this.emit('queue', { running: false });
+    st.running = false;
+    this.emitQueue();
     // Only a queue that actually ran and wasn't interrupted by the user counts
     // as "finished" (this is what triggers shutdown/sleep after downloads).
     const userPaused = rest.some((d) => d.d.status === 'paused');
-    if (this.queueRunCount > 0 && !userPaused) this.emit('queue-done', { failed: rest.filter((d) => d.d.status === 'error').length });
+    if (st.runCount > 0 && !userPaused) this.emit('queue-done', { id: q.id, failed: rest.filter((d) => d.d.status === 'error').length });
   }
 
   setSpeedLimit(kbps) {
@@ -414,24 +475,27 @@ class Manager extends EventEmitter {
 
   // ---------- scheduler ----------
   checkSchedule(now = new Date()) {
-    const sch = this.getSettings().schedule || {};
-    if (!sch.enabled) return;
-    const days = Array.isArray(sch.days) ? sch.days : DAY_KEYS;
     const today = now.toDateString();
     const hm = now.getHours() * 60 + now.getMinutes();
     const toMin = (t) => {
       const m = /^(\d{1,2}):(\d{2})$/.exec(t || '');
       return m ? Number(m[1]) * 60 + Number(m[2]) : null;
     };
-    const start = toMin(sch.startTime);
-    const stop = sch.stopEnabled ? toMin(sch.stopTime) : null;
-    if (start !== null && days.includes(now.getDay()) && hm >= start && hm < start + 2 && this.queueStartedToday !== today) {
-      this.queueStartedToday = today;
-      if (!this.queueRunning && this.queueItems().length) this.startQueue();
-    }
-    if (stop !== null && hm >= stop && hm < stop + 2 && this.queueStoppedToday !== today) {
-      this.queueStoppedToday = today;
-      if (this.queueRunning) this.stopQueue();
+    for (const q of this.queues()) {
+      const sch = q.schedule || {};
+      if (!sch.enabled && !sch.stopEnabled) continue;
+      const st = this.qstate(q.id);
+      const days = Array.isArray(sch.days) ? sch.days : DAY_KEYS;
+      const start = sch.enabled ? toMin(sch.startTime) : null;
+      const stop = sch.stopEnabled ? toMin(sch.stopTime) : null;
+      if (start !== null && days.includes(now.getDay()) && hm >= start && hm < start + 2 && st.startedToday !== today) {
+        st.startedToday = today;
+        if (!st.running && this.queueItems(q.id).length) this.startQueue(q.id);
+      }
+      if (stop !== null && hm >= stop && hm < stop + 2 && st.stoppedToday !== today) {
+        st.stoppedToday = today;
+        if (st.running) this.stopQueue(q.id);
+      }
     }
   }
 }

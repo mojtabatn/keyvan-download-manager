@@ -163,7 +163,7 @@
     return n;
   }
 
-  async function add(modeName) {
+  async function add(modeName, queueId) {
     const info = ctx.info;
     await api.invoke('downloads:add', {
       url: ctx.url,
@@ -176,6 +176,7 @@
       cookies: ctx.cookies,
       userAgent: ctx.userAgent,
       mode: modeName,
+      queueId,
       source: ctx.source,
     });
     close();
@@ -185,7 +186,12 @@
     e.preventDefault();
     add('now');
   });
-  $('infoLater').addEventListener('click', () => add('queue'));
+  // "Download Later": with more than one queue, a small menu asks which one
+  const pickQueue = () => api.invoke('queue:pick');
+  $('infoLater').addEventListener('click', async () => {
+    const q = await pickQueue();
+    if (q) add('queue', q);
+  });
   $('infoWatch').addEventListener('click', async () => {
     await api.invoke('player:open', { url: ctx.url, title: finalName(), referrer: ctx.referrer, cookies: ctx.cookies });
   });
@@ -306,7 +312,7 @@
     $('mediaFolder').title = media.dir;
   }
 
-  async function addMedia(modeName) {
+  async function addMedia(modeName, queueId) {
     const o = media.option;
     if (!o) return;
     const source = media.info.source;
@@ -324,6 +330,7 @@
       cookies: ctx.cookies,
       userAgent: ctx.userAgent,
       mode: modeName,
+      queueId,
       source: ctx.source,
     });
     close();
@@ -333,7 +340,10 @@
     e.preventDefault();
     addMedia('now');
   });
-  $('mediaLater').addEventListener('click', () => addMedia('queue'));
+  $('mediaLater').addEventListener('click', async () => {
+    const q = await pickQueue();
+    if (q) addMedia('queue', q);
+  });
   $('mediaErrorClose').addEventListener('click', close);
   $('mediaFolder').addEventListener('click', async () => {
     const dir = await api.invoke('dialog:pickFolder', media.dir);
@@ -449,16 +459,19 @@
     updateBatch();
   });
 
-  async function addBatch(start) {
-    for (const it of batch.items) if (it.on) await api.invoke('downloads:add', { url: it.url, mode: 'queue', source: ctx.source });
-    if (start) await api.invoke('queue:start');
+  async function addBatch(start, queueId = 'main') {
+    for (const it of batch.items) if (it.on) await api.invoke('downloads:add', { url: it.url, mode: 'queue', queueId, source: ctx.source });
+    if (start) await api.invoke('queue:start', queueId);
     close();
   }
   $('paneBatch').addEventListener('submit', (e) => {
     e.preventDefault();
     addBatch(true);
   });
-  $('batchQueue').addEventListener('click', () => addBatch(false));
+  $('batchQueue').addEventListener('click', async () => {
+    const q = await pickQueue();
+    if (q) addBatch(false, q);
+  });
   $('batchCancel').addEventListener('click', close);
 
   // ------------------------------------------------------------ boot

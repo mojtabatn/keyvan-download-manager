@@ -279,3 +279,70 @@ test('refreshing an expired link keeps progress', async () => {
   slow.server.close();
   await m.shutdown();
 });
+
+test('several queues run independently, each with its own "at a time"', async () => {
+  const s4 = await startServer(makeData(1024 * 1024, 4), { bytesPerSec: 1024 * 1024 });
+  const sched = { enabled: false, startTime: '02:00', stopEnabled: false, stopTime: '08:00', days: [0, 1, 2, 3, 4, 5, 6], afterDone: 'none' };
+  const queues = [
+    { id: 'main', name: 'Main queue', maxConcurrent: 1, schedule: sched },
+    { id: 'night', name: 'Night', maxConcurrent: 2, schedule: sched },
+  ];
+  const { m } = makeManager({ queues, connections: 2 });
+  const main = [1, 2].map((i) => m.add({ url: `${s4.base}/file/m${i}.bin`, mode: 'queue' }));
+  const night = [1, 2, 3].map((i) => m.add({ url: `${s4.base}/file/n${i}.bin`, mode: 'queue', queueId: 'night' }));
+  assert.ok(night.every((d) => d.d.queueId === 'night'));
+  assert.strictEqual(main[0].d.queueId, 'main');
+  assert.strictEqual(m.add({ url: `${s4.base}/file/x.bin`, mode: 'queue', queueId: 'nope' }).d.queueId, 'main', 'unknown queue → main');
+
+  let peak = 0;
+  const iv = setInterval(() => (peak = Math.max(peak, night.filter((d) => d.running).length)), 20);
+  const done = new Promise((r) => m.on('queue-done', (e) => e.id === 'night' && r(e)));
+  m.startQueue('night');
+  assert.deepStrictEqual(m.queueState().queues, { main: false, night: true });
+  await done;
+  clearInterval(iv);
+  assert.strictEqual(peak, 2, 'night queue runs two at a time');
+  assert.ok(night.every((d) => d.d.status === 'completed'));
+  assert.ok(main.every((d) => d.d.status === 'queued'), 'main queue untouched');
+
+  // deleting a queue moves what's left in it to the main queue
+  const later = m.add({ url: `${s4.base}/file/n4.bin`, mode: 'queue', queueId: 'night' });
+  await m.deleteQueue('night');
+  assert.strictEqual(later.d.queueId, 'main');
+  s4.server.close();
+  await m.shutdown();
+});
+
+test('each queue follows its own schedule', async () => {
+  const day = [0, 1, 2, 3, 4, 5, 6];
+  const queues = [
+    { id: 'main', name: 'Main queue', maxConcurrent: 1, schedule: { enabled: true, startTime: '02:00', stopEnabled: false, stopTime: '08:00', days: day, afterDone: 'none' } },
+    { id: 'eve', name: 'Evening', maxConcurrent: 1, schedule: { enabled: true, startTime: '20:30', stopEnabled: true, stopTime: '23:00', days: day, afterDone: 'sleep' } },
+  ];
+  const { m } = makeManager({ queues });
+  m.add({ url: 'http://127.0.0.1:9/a.bin', mode: 'queue' });
+  m.add({ url: 'http://127.0.0.1:9/b.bin', mode: 'queue', queueId: 'eve' });
+  const at = (h, min) => new Date(2026, 10, 12, h, min);
+  m.checkSchedule(at(20, 30));
+  assert.deepStrictEqual(m.queueState().queues, { main: false, eve: true });
+  await m.stopQueue('eve');
+  m.checkSchedule(at(2, 0));
+  assert.deepStrictEqual(m.queueState().queues, { main: true, eve: false });
+  await m.shutdown();
+});
+
+test('old single-queue settings become the "Main queue"', () => {
+  const { Settings } = require('../src/main/settings');
+  const dir = fs.mkdtempSync(path.join(tmp, 's-'));
+  const file = path.join(dir, 'settings.json');
+  fs.writeFileSync(file, JSON.stringify({ maxConcurrent: 5, schedule: { enabled: true, startTime: '01:30', stopEnabled: false, stopTime: '07:00', days: [1, 2], afterDone: 'shutdown' } }));
+  const s = new Settings(file, dir);
+  const q = s.get().queues;
+  assert.strictEqual(q.length, 1);
+  assert.deepStrictEqual({ id: q[0].id, max: q[0].maxConcurrent, start: q[0].schedule.startTime, after: q[0].schedule.afterDone }, { id: 'main', max: 5, start: '01:30', after: 'shutdown' });
+  // bad input is cleaned up and "main" always stays first
+  s.set({ queues: [{ id: 'x y!', name: '  Night  ', maxConcurrent: 99, schedule: { startTime: '25:00', afterDone: 'boom' } }] });
+  const q2 = s.get().queues;
+  assert.deepStrictEqual(q2.map((x) => x.id), ['main', 'xy']);
+  assert.deepStrictEqual([q2[1].name, q2[1].maxConcurrent, q2[1].schedule.startTime, q2[1].schedule.afterDone], ['Night', 20, '02:00', 'none']);
+});

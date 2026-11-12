@@ -149,6 +149,7 @@ class Download extends EventEmitter {
       error: d.error,
       queued: d.queued,
       queueOrder: d.queueOrder || 0,
+      queueId: d.queued ? d.queueId || 'main' : null,
       createdAt: d.createdAt,
       completedAt: d.completedAt || null,
       startedAt: d.startedAt || null,

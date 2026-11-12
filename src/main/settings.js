@@ -50,6 +50,11 @@ class Settings {
     }
     // Older versions stored 'system' (or a theme that no longer exists).
     if (!THEME_IDS.includes(this.data.theme)) this.data.theme = 'light';
+    // Older versions had one queue configured by `schedule` + `maxConcurrent`.
+    if (!Array.isArray(this.data.queues) || !this.data.queues.length) {
+      this.data.queues = [{ id: 'main', name: 'Main queue', maxConcurrent: this.data.maxConcurrent, schedule: { ...this.data.schedule } }];
+    }
+    this.data.queues = sanitizeQueues(this.data.queues, this.data);
   }
 
   get() {
@@ -95,8 +100,42 @@ const clamp = (n, lo, hi, dflt) => {
   return Number.isFinite(x) ? Math.min(hi, Math.max(lo, x)) : dflt;
 };
 
+const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
+const AFTER = ['none', 'exit', 'sleep', 'hibernate', 'shutdown'];
+
+/** Every queue: { id, name, maxConcurrent, schedule }. The first one is always "main". */
+function sanitizeQueues(list, base = {}) {
+  const def = defaults('').schedule;
+  const seen = new Set();
+  const out = [];
+  for (const q of Array.isArray(list) ? list : []) {
+    if (!q || typeof q !== 'object') continue;
+    const id = String(q.id || '').replace(/[^\w-]/g, '').slice(0, 40);
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    const s = { ...def, ...(q.schedule && typeof q.schedule === 'object' ? q.schedule : {}) };
+    out.push({
+      id,
+      name: String(q.name || 'Queue').trim().slice(0, 40) || 'Queue',
+      maxConcurrent: clamp(q.maxConcurrent ?? base.maxConcurrent, 1, 20, 3),
+      schedule: {
+        enabled: !!s.enabled,
+        startTime: TIME.test(s.startTime) ? s.startTime : def.startTime,
+        stopEnabled: !!s.stopEnabled,
+        stopTime: TIME.test(s.stopTime) ? s.stopTime : def.stopTime,
+        days: Array.isArray(s.days) ? [...new Set(s.days.map(Number).filter((d) => d >= 0 && d <= 6))].sort() : def.days,
+        afterDone: AFTER.includes(s.afterDone) ? s.afterDone : 'none',
+      },
+    });
+  }
+  if (!out.some((q) => q.id === 'main')) out.unshift({ id: 'main', name: 'Main queue', maxConcurrent: clamp(base.maxConcurrent, 1, 20, 3), schedule: { ...def } });
+  else out.unshift(...out.splice(out.findIndex((q) => q.id === 'main'), 1));
+  return out.slice(0, 20);
+}
+
 function sanitizePatch(p) {
   const out = { ...p };
+  if ('queues' in out) out.queues = sanitizeQueues(out.queues);
   if ('connections' in out) out.connections = clamp(out.connections, 1, 32, 8);
   if ('maxConcurrent' in out) out.maxConcurrent = clamp(out.maxConcurrent, 1, 20, 3);
   if ('speedLimit' in out) out.speedLimit = clamp(out.speedLimit, 0, 10_000_000, 0);
@@ -107,4 +146,4 @@ function sanitizePatch(p) {
   return out;
 }
 
-module.exports = { Settings };
+module.exports = { Settings, sanitizeQueues };
