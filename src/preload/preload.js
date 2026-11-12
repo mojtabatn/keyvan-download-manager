@@ -12,6 +12,7 @@ const INVOKE = new Set([
   'downloads:add',
   'downloads:action',
   'downloads:contextMenu',
+  'downloads:deleteMany',
   'downloads:pauseAll',
   'downloads:resumeAll',
   'queue:start',

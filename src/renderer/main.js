@@ -15,7 +15,9 @@ const IS_MAC = document.documentElement.dataset.platform === 'mac';
     items: new Map(), // id -> snapshot
     view: 'all',
     query: '',
-    selected: null,
+    selected: null, // the item clicked last (keyboard and context menu act on it)
+    sel: new Set(), // every selected item (Shift / Ctrl / ⌘ click, Select all)
+    anchor: null, // start of a Shift+click range
     settings: null,
     queueRunning: false,
     listView: 'cards', // 'cards' (large icons) | 'compact' (list with small icons)
@@ -58,6 +60,7 @@ const IS_MAC = document.documentElement.dataset.platform === 'mac';
   api.on('downloads:removed', (id) => {
     state.items.delete(id);
     if (state.selected === id) state.selected = null;
+    state.sel.delete(id);
     renderAll();
   });
   api.on('downloads:progress', (list) => {
@@ -120,6 +123,9 @@ const IS_MAC = document.documentElement.dataset.platform === 'mac';
     const items = visibleItems();
     listEl.classList.toggle('compact', state.listView === 'compact');
     if (state.selected && !items.some((d) => d.id === state.selected)) state.selected = null;
+    // items that left this view (filter, search, finished) drop out of the selection
+    const shown = new Set(items.map((d) => d.id));
+    for (const sid of [...state.sel]) if (!shown.has(sid)) state.sel.delete(sid);
     // Re-use existing row elements so hover/selection survive updates.
     const frag = document.createDocumentFragment();
     const keep = new Set();
@@ -201,12 +207,16 @@ const IS_MAC = document.documentElement.dataset.platform === 'mac';
     });
     row.addEventListener('click', (e) => {
       e.stopPropagation();
-      select(id);
+      if (e.shiftKey && state.anchor) selectRange(state.anchor, id);
+      else if (e.ctrlKey || e.metaKey) toggleSelect(id);
+      else select(id);
     });
+    // keep Shift+click from also selecting the row's text
+    row.addEventListener('mousedown', (e) => e.shiftKey && e.preventDefault());
     row.addEventListener('dblclick', () => api.invoke('downloads:action', { id, action: 'open' }));
     row.addEventListener('contextmenu', (e) => {
       e.preventDefault();
-      select(id);
+      if (!state.sel.has(id)) select(id);
       api.invoke('downloads:contextMenu', id);
     });
     return { row, divider, parts: { cat, nameText, name, toggle, toggleImg, x, bar, fill, speed, eta, size, doneMeta, cSize, cStat }, key: '' };
@@ -215,7 +225,7 @@ const IS_MAC = document.documentElement.dataset.platform === 'mac';
   function fillRow(r, d) {
     const p = r.parts;
     const done = d.status === 'completed';
-    const cls = `row ${done ? 'done' : d.status}${state.selected === d.id ? ' selected' : ''}`;
+    const cls = `row ${done ? 'done' : d.status}${state.sel.has(d.id) ? ' selected' : ''}`;
     if (r.row.className !== cls) r.row.className = cls;
     const catSrc = catIcon(d.category, 'min');
     if (p.cat.getAttribute('src') !== catSrc) p.cat.src = catSrc;
@@ -278,30 +288,82 @@ const IS_MAC = document.documentElement.dataset.platform === 'mac';
   function updateRow(d) {
     const r = rows.get(d.id);
     if (r) fillRow(r, d);
-    if (d.id === state.selected) updateActions();
+    if (state.sel.has(d.id)) updateActions();
   }
 
   function select(id) {
+    state.sel = new Set(id ? [id] : []);
     state.selected = id;
-    for (const [rid, r] of rows) r.row.classList.toggle('selected', rid === id);
+    state.anchor = id;
+    applySelection();
+  }
+  function toggleSelect(id) {
+    if (state.sel.has(id)) state.sel.delete(id);
+    else state.sel.add(id);
+    state.selected = state.sel.has(id) ? id : [...state.sel].pop() || null;
+    state.anchor = id;
+    applySelection();
+  }
+  /** Shift+click: everything between the anchor and this row, in the order shown. */
+  function selectRange(from, to) {
+    const ids = visibleItems().map((d) => d.id);
+    let a = ids.indexOf(from);
+    const b = ids.indexOf(to);
+    if (a < 0) a = b;
+    const [lo, hi] = a < b ? [a, b] : [b, a];
+    state.sel = new Set(ids.slice(lo, hi + 1));
+    state.selected = to;
+    applySelection();
+  }
+  function selectAll(on = true) {
+    const ids = visibleItems().map((d) => d.id);
+    state.sel = new Set(on ? ids : []);
+    state.selected = on ? ids[0] || null : null;
+    state.anchor = state.selected;
+    applySelection();
+  }
+  function applySelection() {
+    for (const [rid, r] of rows) r.row.classList.toggle('selected', state.sel.has(rid));
     updateActions();
   }
+  const selectedItems = () => [...state.sel].map((id) => state.items.get(id)).filter(Boolean);
 
   // ------------------------------------------------------------ actions toolbar
   const isRunning = (d) => d && (d.status === 'downloading' || d.status === 'connecting');
+  const canResume = (d) => ['paused', 'error', 'canceled', 'queued'].includes(d.status);
+  const canPause = (d) => isRunning(d) || d.status === 'queued';
   function updateActions() {
-    const d = state.selected ? state.items.get(state.selected) : null;
+    const sel = state.view === 'settings' ? [] : selectedItems();
+    const many = sel.length > 1;
     const resume = $('actResume');
-    resume.disabled = !(d && ['paused', 'error', 'canceled', 'queued'].includes(d.status));
-    resume.dataset.tip = d && d.status === 'error' ? 'Retry' : 'Resume';
-    $('actPause').disabled = !(d && (isRunning(d) || d.status === 'queued'));
+    resume.disabled = !sel.some(canResume);
+    resume.dataset.tip = !many && sel[0] && sel[0].status === 'error' ? 'Retry' : many ? `Resume ${sel.filter(canResume).length}` : 'Resume';
+    $('actPause').disabled = !sel.some(canPause);
+    $('actPause').dataset.tip = many ? `Pause ${sel.filter(canPause).length}` : 'Pause';
     $('actStop').disabled = ![...state.items.values()].some((x) => isRunning(x) || (x.status === 'queued' && state.queueRunning));
-    $('actDelete').disabled = !d;
+    $('actDelete').disabled = !sel.length;
+    $('actDelete').dataset.tip = many ? `Delete ${sel.length} downloads` : 'Delete';
+    const shown = state.view === 'settings' ? 0 : visibleItems().length;
+    const all = shown > 0 && sel.length === shown;
+    const sa = $('actSelectAll');
+    sa.disabled = !shown;
+    sa.classList.toggle('on', all);
+    sa.dataset.tip = all ? 'Deselect all' : 'Select all';
   }
-  $('actResume').addEventListener('click', () => state.selected && api.invoke('downloads:action', { id: state.selected, action: 'start' }));
-  $('actPause').addEventListener('click', () => state.selected && api.invoke('downloads:action', { id: state.selected, action: 'pause' }));
+  $('actResume').addEventListener('click', () => {
+    for (const d of selectedItems().filter(canResume)) api.invoke('downloads:action', { id: d.id, action: 'start' });
+  });
+  $('actPause').addEventListener('click', () => {
+    for (const d of selectedItems().filter(canPause)) api.invoke('downloads:action', { id: d.id, action: 'pause' });
+  });
   $('actStop').addEventListener('click', () => api.invoke('downloads:pauseAll'));
-  $('actDelete').addEventListener('click', () => state.selected && api.invoke('downloads:action', { id: state.selected, action: 'delete' }));
+  $('actDelete').addEventListener('click', () => deleteSelected());
+  $('actSelectAll').addEventListener('click', () => selectAll(!$('actSelectAll').classList.contains('on')));
+  function deleteSelected() {
+    const ids = [...state.sel];
+    if (ids.length === 1) api.invoke('downloads:action', { id: ids[0], action: 'delete' });
+    else if (ids.length > 1) api.invoke('downloads:deleteMany', ids);
+  }
   // clicking empty space in a list clears the selection
   for (const id of ['list', 'qlist']) $(id).addEventListener('click', () => select(null));
 
@@ -508,6 +570,11 @@ const IS_MAC = document.documentElement.dataset.platform === 'mac';
     if (e.target.closest('input, textarea, select')) return;
     const id = state.selected;
     const mod = e.ctrlKey || e.metaKey; // ⌘ on macOS
+    if (mod && e.key.toLowerCase() === 'a' && state.view !== 'settings') {
+      e.preventDefault();
+      selectAll(true);
+      return;
+    }
     if (mod && e.key.toLowerCase() === 'n') {
       e.preventDefault();
       openAdd();
@@ -519,7 +586,7 @@ const IS_MAC = document.documentElement.dataset.platform === 'mac';
     } else if (e.key === 'Escape') {
       select(null);
     } else if (e.key === 'Delete' || (IS_MAC && e.key === 'Backspace' && e.metaKey)) {
-      api.invoke('downloads:action', { id, action: 'delete' });
+      deleteSelected();
     } else if (e.key === 'Enter') {
       api.invoke('downloads:action', { id, action: 'open' });
     } else if (e.key === ' ') {

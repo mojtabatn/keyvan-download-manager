@@ -111,6 +111,8 @@ colors the window title bar to match.
 - SHA-256 checksum of finished files
 - **Automatic updates**: KDM checks GitHub Releases, shows an *Update Available!* button in the sidebar, downloads
   the new version and installs it with one click (can be turned off in Settings → About)
+- Select several downloads with `Shift`+click (a range) or `Ctrl`+click, or all of them with **Select all** /
+  `Ctrl+A`, then resume, pause or delete them together (one confirmation, with the option to delete the files too)
 - Keyboard shortcuts: `Ctrl+N` add link · `Ctrl+F` search · `Ctrl+V` paste links · `Space` pause or resume ·
   `Enter` open · `Delete` cancel or remove
 

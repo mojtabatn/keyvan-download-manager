@@ -139,7 +139,7 @@
 .search.has-text .search-clear { display: block; }
 .search-clear:hover img { filter: brightness(0.8); }
 
-.actions { width: 132px; display: flex; align-items: center; justify-content: space-between; padding: 0 9px; }
+.actions { width: 164px; display: flex; align-items: center; justify-content: space-between; padding: 0 9px; }
 .view-switch { width: 68px; display: flex; align-items: center; justify-content: space-between; padding: 0 9px; }
 .tool-btn { position: relative; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 5px; color: var(--text-3); }
 .tool-btn svg { width: 24px; height: 24px; display: block; }
@@ -152,6 +152,8 @@
 .tool-btn.pause:not(:disabled),
 .tool-btn.stop:not(:disabled) { color: var(--act-pause, #a23c8a); }
 .tool-btn.delete:not(:disabled) { color: var(--act-delete, #fe3440); }
+.tool-btn.select-all:not(:disabled) { color: var(--act-select, #12be42); }
+.tool-btn.select-all.on svg rect { fill-opacity: 0.45; }
 .view-switch .tool-btn { color: var(--text-3); }
 .view-switch .tool-btn svg { opacity: 0.75; }
 :root[data-base='dark'] { --act-resume: var(--link); --act-pause: #dc86cb; --act-delete: #ff6b72; }
@@ -191,7 +193,7 @@
   z-index: 60;
   animation: tip 0.12s ease-out 0.25s both;
 }
-.actions .tool-btn.delete[data-tip]:hover::after { left: auto; right: -10px; transform: none; }
+.actions .tool-btn.select-all[data-tip]:hover::after { left: auto; right: -10px; transform: none; }
 :root[data-base='dark'] [data-tip]:hover::after { background: #f2f2f2; color: #191919; }
 :root[data-base='dark'] [data-tip]:hover::before { border-bottom-color: #f2f2f2; }
 @keyframes tip { from { opacity: 0; } to { opacity: 1; } }

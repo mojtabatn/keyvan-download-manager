@@ -455,6 +455,36 @@ async function confirmRemove(win, snap) {
   return response === 0;
 }
 
+/** Toolbar "Delete" with several items selected: one confirmation, optionally deleting the files too. */
+async function deleteMany(win, ids) {
+  const items = [...new Set(ids)].map((id) => manager.get(id)).filter(Boolean).map((dl) => dl.snapshot());
+  if (!items.length) return false;
+  const done = items.filter((s) => s.status === 'completed');
+  const onDisk = done.filter((s) => fs.existsSync(s.savePath));
+  const unfinished = items.length - done.length;
+  const lines = [];
+  if (done.length) lines.push(`${done.length} finished download${done.length > 1 ? 's' : ''} will be removed from the list.`);
+  if (unfinished) lines.push(`${unfinished} unfinished download${unfinished > 1 ? 's' : ''} will stop, and their partially downloaded data will be deleted.`);
+  const opts = {
+    type: 'question',
+    buttons: [`Delete ${items.length}`, 'Cancel'],
+    defaultId: 1,
+    cancelId: 1,
+    noLink: true,
+    title: 'Keyvan Download Manager',
+    message: `Delete ${items.length} downloads?`,
+    detail: lines.join('\n'),
+  };
+  if (onDisk.length) {
+    opts.checkboxLabel = `Also delete ${onDisk.length === 1 ? 'the downloaded file' : `the ${onDisk.length} downloaded files`} from disk`;
+    opts.checkboxChecked = false;
+  }
+  const { response, checkboxChecked } = await dialog.showMessageBox(win, opts);
+  if (response !== 0) return false;
+  for (const s of items) await manager.remove(s.id, { deleteFile: s.status === 'completed' && !!checkboxChecked }).catch((err) => logError('delete', err));
+  return true;
+}
+
 async function runAction(win, { id, action, value }) {
   const dl = manager.get(id);
   if (!dl) return null;
@@ -635,6 +665,7 @@ function registerIpc() {
     return dl.snapshot();
   });
   h('downloads:action', (e, payload) => runAction(senderWindow(e), payload || {}));
+  h('downloads:deleteMany', (e, ids) => deleteMany(senderWindow(e), Array.isArray(ids) ? ids : []));
   h('downloads:contextMenu', (e, id) => contextMenuFor(senderWindow(e), id));
   h('downloads:pauseAll', () => manager.pauseAll());
   h('downloads:resumeAll', () => manager.resumeAll());
