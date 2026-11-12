@@ -3,6 +3,21 @@ const APP = 'http://127.0.0.1:17842';
 const DEFAULTS = { enabled: true, minSizeKB: 512 };
 const SKIP_MIME = /^(image\/|text\/(html|css|javascript|plain)|application\/(json|javascript|xml|x-javascript|pdf))/i;
 const handedOff = new Set();
+// A download only counts if the browser started it just now. When the browser opens, it also reports
+// every download from its history (finished, interrupted…); those must never be sent to KDM again.
+const FRESH_MS = 60 * 1000;
+const isFresh = (item) => {
+  const t = Date.parse(item.startTime || '');
+  return item.state === 'in_progress' && t > Date.now() - FRESH_MS && t < Date.now() + FRESH_MS;
+};
+/** Each browser download is handed over at most once, even if the browser reports it again. */
+async function firstTime(id) {
+  const key = 'handled';
+  const { [key]: list = [] } = await chrome.storage.local.get(key);
+  if (list.includes(id)) return false;
+  await chrome.storage.local.set({ [key]: [...list.slice(-199), id] });
+  return true;
+}
 
 async function getConfig() {
   return { ...DEFAULTS, ...(await chrome.storage.local.get(DEFAULTS)) };
@@ -48,6 +63,8 @@ const baseName = (p) => (p || '').split(/[\\/]/).pop();
 // ---------------------------------------------------------------- capture browser downloads
 chrome.downloads.onCreated.addListener(async (item) => {
   if (handedOff.has(item.url)) return handedOff.delete(item.url); // our own fallback
+  if (item.byExtensionId && item.byExtensionId === chrome.runtime.id) return;
+  if (!isFresh(item)) return; // an old download from the browser's history
   const cfg = await getConfig();
   if (!cfg.enabled) return;
   const url = item.finalUrl || item.url;
@@ -58,6 +75,7 @@ chrome.downloads.onCreated.addListener(async (item) => {
 
   const app = await ping();
   if (!app || !app.enabled) return; // app closed or integration off: let the browser handle it
+  if (!(await firstTime(item.id))) return;
 
   try {
     await chrome.downloads.cancel(item.id);

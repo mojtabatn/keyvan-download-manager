@@ -339,11 +339,29 @@ function openFromBrowser(p) {
     win.__url = p.urls[0];
     return;
   }
+  // Several downloads arriving at once (a page starting many, or an older extension replaying the
+  // browser's history) open ONE window with a checklist instead of a window each.
+  browserBurst.push({ ...p, url: p.url || p.urls[0] });
+  clearTimeout(browserBurst.timer);
+  browserBurst.timer = setTimeout(flushBrowserBurst, 800);
+}
+
+const browserBurst = [];
+function flushBrowserBurst() {
+  const open = new Set(windows.all().map((w) => w.__url).filter(Boolean));
+  const seen = new Set();
+  const items = browserBurst.splice(0).filter((x) => !open.has(x.url) && !seen.has(x.url) && seen.add(x.url));
+  if (!items.length) return;
+  if (items.length > 1) {
+    const win = windows.openDialog({ mode: 'add', url: items.map((x) => x.url).join('\n'), source: 'browser' });
+    win.__url = items[0].url;
+    return;
+  }
   const token = crypto.randomUUID();
-  dialogPayloads.set(token, { ...p, url: p.url || p.urls[0], source: 'browser' });
+  dialogPayloads.set(token, { ...items[0], source: 'browser' });
   setTimeout(() => dialogPayloads.delete(token), 10 * 60 * 1000);
   const win = windows.openDialog({ mode: 'info', token });
-  win.__url = p.url;
+  win.__url = items[0].url;
 }
 
 // ---------------------------------------------------------------- tray
