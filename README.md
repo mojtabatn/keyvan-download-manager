@@ -182,9 +182,12 @@ The UI uses the **Manrope** font (bundled, SIL Open Font License), so it looks t
 
 ## Publishing a new version
 
-1. Raise `version` in `package.json` (for example `0.2.0`), commit and push.
-2. On GitHub, publish a release with the tag `v0.2.0`. The **Build release** workflow then builds the Windows and
-   Mac versions on GitHub's own machines and attaches them to the release (it takes about 10 minutes).
+1. Raise `version` in `package.json` (for example `0.2.0`) and describe the changes in
+   `docs/release-notes/v0.2.0.md`. Commit and push.
+2. Push a tag with the same version: `git tag v0.2.0 && git push origin v0.2.0`.
+   The **Build release** workflow creates the release on GitHub, builds the Windows and Mac versions on GitHub's own
+   machines and attaches them (about 10 minutes). The tag must match `package.json`, or the workflow stops.
+   Publishing a release by hand on GitHub works too.
 3. Installed copies of KDM find it within a few hours, or right away with **Settings → About → Check now**.
 
 ## License
