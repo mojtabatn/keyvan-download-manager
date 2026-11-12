@@ -4,7 +4,9 @@
 #    the Windows and Mac versions.
 #  - Publishing a release by hand on GitHub does the same builds.
 #  - "Run workflow" on the Actions tab builds the chosen branch (normally main) and attaches the files to an
-#    existing release, e.g. to add the Mac version to v0.1.0.
+#    existing release, e.g. to add the Mac version to v0.1.0. "links" only refreshes the fixed-name copies.
+#  - Every release also gets copies with fixed names (KDM-Setup.exe, KDM-Portable.exe, KDM-mac-arm64.dmg,
+#    KDM-mac-x64.dmg), so .../releases/latest/download/<name> always downloads the newest version.
 name: Build release
 
 on:
@@ -20,7 +22,7 @@ on:
       platforms:
         description: Which versions to build
         type: choice
-        options: [mac, windows, both]
+        options: [mac, windows, both, links]
         default: both
 
 permissions:
@@ -117,3 +119,30 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "$TAG" ${{ matrix.files }} --clobber --repo "$GITHUB_REPOSITORY"
+
+  # Copies with fixed names for the README's download buttons (…/releases/latest/download/KDM-Setup.exe).
+  links:
+    needs: [release, build]
+    if: always() && needs.release.outputs.build == 'yes' && needs.build.result != 'failure'
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag || github.ref_name }}
+    steps:
+      - name: Attach fixed-name copies
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir in out
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --dir in --pattern 'KDM-*'
+          for f in in/*; do
+            n=$(basename "$f")
+            case "$n" in
+              KDM-Setup-*.exe) cp "$f" out/KDM-Setup.exe ;;
+              KDM-Portable-*.exe) cp "$f" out/KDM-Portable.exe ;;
+              KDM-*-mac-arm64.dmg) cp "$f" out/KDM-mac-arm64.dmg ;;
+              KDM-*-mac-x64.dmg) cp "$f" out/KDM-mac-x64.dmg ;;
+            esac
+          done
+          ls -la out
+          gh release upload "$TAG" out/* --clobber --repo "$GITHUB_REPOSITORY"

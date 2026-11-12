@@ -1,5 +1,7 @@
 <div align="center">
 
+**English** · [فارسی](README.fa.md)
+
 <img src="src/renderer/assets/icons/logo.svg" width="96" alt="KDM logo" />
 
 # Keyvan Download Manager
@@ -8,7 +10,16 @@
 
 Multi-connection downloads · Video grabber for YouTube, X and 1000+ sites · Queue and scheduler · 10 themes
 
-![Version](https://img.shields.io/badge/version-0.1.0-1e83f1)
+### Download
+
+<a href="https://github.com/mojtabatn/keyvan-download-manager/releases/latest/download/KDM-Setup.exe"><img src="docs/buttons/windows-en.svg" alt="Download for Windows" height="56" /></a>
+<a href="https://github.com/mojtabatn/keyvan-download-manager/releases/latest/download/KDM-mac-arm64.dmg"><img src="docs/buttons/mac-arm-en.svg" alt="Download for Mac (Apple Silicon)" height="56" /></a>
+<a href="https://github.com/mojtabatn/keyvan-download-manager/releases/latest/download/KDM-mac-x64.dmg"><img src="docs/buttons/mac-intel-en.svg" alt="Download for Mac (Intel)" height="56" /></a>
+
+[Portable Windows version](https://github.com/mojtabatn/keyvan-download-manager/releases/latest/download/KDM-Portable.exe) (no installation) ·
+[All versions and what's new](https://github.com/mojtabatn/keyvan-download-manager/releases/latest) · [How to install](#install)
+
+[![Latest version](https://img.shields.io/github/v/release/mojtabatn/keyvan-download-manager?label=version&color=1e83f1)](https://github.com/mojtabatn/keyvan-download-manager/releases/latest)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS-0078d4)
 ![License](https://img.shields.io/badge/license-MIT-12be42)
 
@@ -80,9 +91,9 @@ download them now or add them to the queue.
 
 - Create **as many queues as you like** (for example *Night downloads*), each with its own schedule, its own number of
   downloads at a time and its own action when it finishes; right-click a download to move it to another queue
-- Put downloads in a queue and choose how many run **at a time**
+- A queue downloads **one file at a time** (you can allow more)
 - **Start** and **stop** the queue at set times on chosen days, for example overnight when internet is cheaper
-- **When finished**: shut down, sleep, hibernate or close KDM, with a 60-second countdown you can cancel
+- **When finished**: shut down, sleep, hibernate (Windows) or close KDM, with a 60-second countdown you can cancel
 
 <img src="docs/screenshots/queue.png" width="760" alt="Queue and scheduler" />
 
@@ -126,18 +137,19 @@ colors the window title bar to match.
 
 ## Install
 
-Get the latest version from the [Releases](https://github.com/mojtabatn/keyvan-download-manager/releases/latest) page.
+Use the download buttons at the top of this page, or pick a file on the [Releases](https://github.com/mojtabatn/keyvan-download-manager/releases/latest) page.
 
 ### Windows 10 / 11
 
-1. Download `KDM-Setup-0.1.0.exe`, or `KDM-Portable-0.1.0.exe` if you don't want to install anything.
+1. Download the [installer](https://github.com/mojtabatn/keyvan-download-manager/releases/latest/download/KDM-Setup.exe), or the
+   [portable version](https://github.com/mojtabatn/keyvan-download-manager/releases/latest/download/KDM-Portable.exe) if you don't want to install anything.
 2. The app isn't code-signed yet, so Windows SmartScreen may warn you. Click **More info → Run anyway**.
 
 ### macOS 11 or newer
 
 1. Download the file for your Mac:
-   - Apple Silicon (M1, M2, M3, M4…): `KDM-0.1.0-mac-arm64.dmg`
-   - Intel: `KDM-0.1.0-mac-x64.dmg`
+   - [Apple Silicon (M1, M2, M3, M4…)](https://github.com/mojtabatn/keyvan-download-manager/releases/latest/download/KDM-mac-arm64.dmg)
+   - [Intel](https://github.com/mojtabatn/keyvan-download-manager/releases/latest/download/KDM-mac-x64.dmg)
 
    Not sure which one? Apple menu → **About This Mac** → the *Chip* line says Apple M… or Intel.
 2. Open the `.dmg` and drag **Keyvan Download Manager** into **Applications**.
@@ -189,6 +201,10 @@ The UI uses the **Manrope** font (bundled, SIL Open Font License), so it looks t
    machines and attaches them (about 10 minutes). The tag must match `package.json`, or the workflow stops.
    Publishing a release by hand on GitHub works too.
 3. Installed copies of KDM find it within a few hours, or right away with **Settings → About → Check now**.
+
+## Author
+
+**Mojtaba Navade** · [Telegram](https://t.me/mojtabatn) · [Instagram](https://www.instagram.com/mojtabanavade)
 
 ## License
 
