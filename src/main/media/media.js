@@ -8,7 +8,15 @@ const { EventEmitter } = require('events');
 const { sanitize, uniquePath } = require('../engine/filename');
 
 // yt-dlp is a Python program: force UTF-8 so non-English titles survive on Windows.
-const childEnv = () => ({ ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' });
+// ELECTRON_RUN_AS_NODE lets yt-dlp use KDM's own executable as its JavaScript runtime (see jsArgs).
+const childEnv = () => ({ ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8', ...(process.versions.electron ? { ELECTRON_RUN_AS_NODE: '1' } : {}) });
+
+/**
+ * YouTube only hands out its video files after a JavaScript challenge is solved, so yt-dlp needs a
+ * JavaScript runtime. Electron contains Node.js: started with ELECTRON_RUN_AS_NODE=1, KDM's own
+ * executable behaves exactly like `node`, so users don't have to install anything.
+ */
+const jsArgs = () => ['--js-runtimes', `node:${process.execPath}`];
 const KNOWN_VIDEO_HOSTS = /(^|\.)(youtube\.com|youtu\.be|x\.com|twitter\.com|instagram\.com|tiktok\.com|vimeo\.com|facebook\.com|fb\.watch|aparat\.com|twitch\.tv|dailymotion\.com|reddit\.com|soundcloud\.com|bilibili\.com|vk\.com|ok\.ru|rumble\.com|streamable\.com|telewebion\.com|namava\.ir|filimo\.com)$/i;
 
 function isVideoPage(url) {
@@ -43,7 +51,7 @@ function killTree(proc) {
 /** Runs `yt-dlp -J` and returns the parsed info JSON. */
 function probeInfo(ytdlp, url, headers = {}, timeout = 90000) {
   return new Promise((resolve, reject) => {
-    const args = ['-J', '--no-playlist', '--no-warnings', '--no-colors', ...headerArgs(headers), '--', url];
+    const args = ['-J', '--no-playlist', '--no-warnings', '--no-colors', ...jsArgs(), ...headerArgs(headers), '--', url];
     const p = spawn(ytdlp, args, { windowsHide: true, env: childEnv() });
     let out = '';
     let err = '';
@@ -71,12 +79,15 @@ function probeInfo(ytdlp, url, headers = {}, timeout = 90000) {
   });
 }
 
+const FORMATS_MISSING = 'The site didn’t offer a downloadable version of this video';
+
 function cleanError(text) {
   const lines = String(text || '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   const line = lines.filter((l) => /ERROR:/.test(l)).pop();
   if (!line) return lines.length ? lines[lines.length - 1].slice(0, 200) : '';
   let msg = line.replace(/^.*?ERROR:\s*/, '').replace(/\[[^\]]+\]\s*[\w-]+:\s*/, '');
   if (/Unsupported URL/i.test(msg)) msg = 'No video found on this page';
+  if (/Requested format is not available|Only images are available|n challenge|nsig/i.test(msg)) msg = FORMATS_MISSING;
   if (/DRM/i.test(msg)) msg = 'This video is DRM-protected and can’t be downloaded';
   if (/Sign in|login|cookies/i.test(msg)) msg = 'This video needs you to be signed in — try the browser button instead';
   if (/Private video|unavailable/i.test(msg)) msg = 'This video is private or unavailable';
@@ -269,6 +280,7 @@ class MediaDownload extends EventEmitter {
       const args = [
         '-f', this.d.format || 'bv*+ba/b',
         '--no-playlist',
+        ...jsArgs(),
         '--newline',
         '--no-colors',
         '--quiet',
@@ -402,4 +414,4 @@ function mediaTarget(dir, title, ext, taken) {
   return uniquePath(dir, name, taken);
 }
 
-module.exports = { MediaDownload, probeMedia, buildOptions, isVideoPage, mediaTarget };
+module.exports = { MediaDownload, probeMedia, buildOptions, isVideoPage, mediaTarget, FORMATS_MISSING };

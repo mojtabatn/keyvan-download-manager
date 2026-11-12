@@ -9,6 +9,13 @@ const args = process.argv.slice(2);
 const url = args[args.indexOf('--') + 1] || '';
 const opt = (name) => (args.includes(name) ? args[args.indexOf(name) + 1] : null);
 
+if (process.env.FAKE_YTDLP_LOG) fs.appendFileSync(process.env.FAKE_YTDLP_LOG, JSON.stringify(args) + '\n');
+if (args.includes('-U')) process.exit(0);
+// like YouTube when its JavaScript challenge can't be solved: until "-U" ran, no formats
+if (/needs-update/.test(url) && !(process.env.FAKE_YTDLP_LOG && fs.readFileSync(process.env.FAKE_YTDLP_LOG, 'utf8').includes('"-U"'))) {
+  process.stderr.write('ERROR: [youtube] abc: Requested format is not available. Use --list-formats for a list of available formats\n');
+  process.exit(1);
+}
 if (args.includes('--version')) {
   console.log('2026.11.01-fake');
   process.exit(0);
@@ -20,6 +27,16 @@ if (/unsupported/.test(url)) {
 if (/drm/.test(url)) {
   process.stderr.write('ERROR: [Generic] drm: This video is DRM protected\n');
   process.exit(1);
+}
+// Like yt-dlp, actually run the JavaScript runtime it was given (KDM passes its own executable).
+const rt = opt('--js-runtimes');
+if (rt) {
+  const bin = rt.replace(/^node:/, '');
+  const r = require('child_process').spawnSync(bin, ['-e', 'process.stdout.write(String(6 * 7))'], { encoding: 'utf8' });
+  if (r.stdout !== '42') {
+    process.stderr.write(`ERROR: [youtube] JavaScript runtime ${bin} did not work (${(r.stderr || r.error || '').toString().slice(0, 120)})\n`);
+    process.exit(1);
+  }
 }
 if (args.includes('-J')) {
   const info = {

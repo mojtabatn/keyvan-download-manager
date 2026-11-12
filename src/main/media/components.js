@@ -120,6 +120,28 @@ class Components {
     return this.installing;
   }
 
+  /**
+   * Updates yt-dlp if the last update attempt is older than maxAge (ms).
+   * Resolves true when an update was attempted, false when it was recent enough.
+   */
+  async updateIfStale(maxAge) {
+    const stamp = path.join(this.dir, '.last-update');
+    let last = 0;
+    try {
+      last = Number(await fsp.readFile(stamp, 'utf8')) || 0;
+    } catch {
+      try {
+        last = (await fsp.stat(this.ytdlpPath)).mtimeMs; // first time: use the install date
+      } catch {
+        /* not installed */
+      }
+    }
+    if (Date.now() - last < maxAge) return false;
+    await fsp.writeFile(stamp, String(Date.now())).catch(() => {});
+    await this.update().catch(() => {});
+    return true;
+  }
+
   /** yt-dlp updates itself in place (sites change often, so this matters). */
   async update() {
     if (!fs.existsSync(this.ytdlpPath)) return this.install();

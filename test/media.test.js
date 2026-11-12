@@ -10,7 +10,7 @@ const path = require('path');
 const http = require('http');
 const zlib = require('zlib');
 const { Manager } = require('../src/main/engine/manager');
-const { probeMedia, isVideoPage } = require('../src/main/media/media');
+const { probeMedia, isVideoPage, FORMATS_MISSING } = require('../src/main/media/media');
 const { Components } = require('../src/main/media/components');
 
 const FAKE = path.join(__dirname, 'fixtures', 'fake-ytdlp.js');
@@ -62,6 +62,40 @@ test('probe turns yt-dlp formats into clear quality choices', async () => {
 test('probe reports unsupported pages and DRM clearly', async () => {
   await assert.rejects(probeMedia(FAKE, 'https://example.com/unsupported', {}), /No video found/);
   await assert.rejects(probeMedia(FAKE, 'https://example.com/drm', {}), /DRM/);
+});
+
+test('yt-dlp gets a JavaScript runtime (needed for YouTube) and clear errors', async () => {
+  const log = path.join(tmp, 'args.log');
+  process.env.FAKE_YTDLP_LOG = log;
+  try {
+    await probeMedia(FAKE, 'https://www.youtube.com/watch?v=abc', {});
+    const args = JSON.parse(fs.readFileSync(log, 'utf8').trim().split('\n').pop());
+    const i = args.indexOf('--js-runtimes');
+    assert.ok(i >= 0, 'runtime passed');
+    assert.strictEqual(args[i + 1], `node:${process.execPath}`);
+    await assert.rejects(probeMedia(FAKE, 'https://www.youtube.com/watch?v=needs-update', {}), (e) => e.message === FORMATS_MISSING);
+  } finally {
+    delete process.env.FAKE_YTDLP_LOG;
+  }
+});
+
+test('an outdated yt-dlp is updated at most once per period', async () => {
+  const dir = fs.mkdtempSync(path.join(tmp, 'tools-'));
+  const log = path.join(dir, 'args.log');
+  process.env.FAKE_YTDLP_LOG = log;
+  try {
+    fs.copyFileSync(FAKE, path.join(dir, 'yt-dlp'));
+    fs.chmodSync(path.join(dir, 'yt-dlp'), 0o755);
+    fs.writeFileSync(path.join(dir, 'ffmpeg'), '');
+    const c = new Components(dir, 'linux');
+    const old = Date.now() / 1000 - 10 * 24 * 3600;
+    fs.utimesSync(path.join(dir, 'yt-dlp'), old, old);
+    assert.strictEqual(await c.updateIfStale(3 * 24 * 3600 * 1000), true, 'ten days old: update');
+    assert.ok(fs.readFileSync(log, 'utf8').includes('"-U"'));
+    assert.strictEqual(await c.updateIfStale(3 * 24 * 3600 * 1000), false, 'just updated: skip');
+  } finally {
+    delete process.env.FAKE_YTDLP_LOG;
+  }
 });
 
 test('video download: two streams, progress, merge stage, completion', async () => {

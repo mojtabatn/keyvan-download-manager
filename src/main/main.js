@@ -30,7 +30,7 @@ const { startIntegrationServer } = require('./integration/server');
 const { watchClipboard } = require('./integration/clipboard');
 const { PowerActions } = require('./power');
 const { Components } = require('./media/components');
-const { probeMedia, isVideoPage } = require('./media/media');
+const { probeMedia, isVideoPage, FORMATS_MISSING } = require('./media/media');
 const { Updater } = require('./updater');
 
 const APP_ID = 'com.mojtaba.kdm';
@@ -158,6 +158,8 @@ app.whenReady().then(() => {
   });
 
   startUpdater();
+  // keep yt-dlp current in the background (video sites change their pages often)
+  setTimeout(() => tools.ready() && tools.updateIfStale(3 * 24 * 3600 * 1000).catch(() => {}), 20000);
   handleArgv(process.argv);
 });
 
@@ -723,14 +725,20 @@ function registerIpc() {
     const headers = { referrer: opts.referrer, cookies: opts.cookies, userAgent: opts.userAgent };
     const candidates = [...new Set([opts.url, ...(opts.candidates || [])].filter((u) => /^https?:\/\//i.test(u || '')))];
     let lastError = 'No video found on this page';
-    for (const url of candidates) {
-      try {
-        return { ...(await probeMedia(tools.ytdlpPath, url, headers)), source: url };
-      } catch (e) {
-        lastError = e.message;
+    const tryAll = async () => {
+      for (const url of candidates) {
+        try {
+          return { ...(await probeMedia(tools.ytdlpPath, url, headers)), source: url };
+        } catch (e) {
+          lastError = e.message;
+        }
       }
-    }
-    return { error: lastError };
+      return null;
+    };
+    let found = await tryAll();
+    // Sites like YouTube change often; an outdated yt-dlp is the usual cause. Update once and retry.
+    if (!found && lastError === FORMATS_MISSING && (await tools.updateIfStale(60 * 60 * 1000))) found = await tryAll();
+    return found || { error: lastError };
   });
   h('update:state', () => (updater ? updater.state : null));
   h('update:check', () => (updater ? updater.check() : null));
