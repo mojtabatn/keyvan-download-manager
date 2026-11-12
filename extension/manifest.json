@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "KDM — Keyvan Download Manager",
   "short_name": "KDM",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Sends your browser downloads to Keyvan Download Manager (KDM): multi-connection, resume, scheduling.",
   "permissions": [
     "downloads",
