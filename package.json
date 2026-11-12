@@ -1,7 +1,7 @@
 {
   "name": "keyvan-download-manager",
   "productName": "Keyvan Download Manager",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Keyvan Download Manager (KDM): a minimal, fast, multi-connection download manager for Windows",
   "main": "src/main/main.js",
   "author": "Mojtaba",
