@@ -152,8 +152,12 @@
 .tool-btn.pause:not(:disabled),
 .tool-btn.stop:not(:disabled) { color: var(--act-pause, #a23c8a); }
 .tool-btn.delete:not(:disabled) { color: var(--act-delete, #fe3440); }
-.tool-btn.select-all:not(:disabled) { color: var(--act-select, #12be42); }
-.tool-btn.select-all.on svg rect { fill-opacity: 0.45; }
+/* Select all (design icons): grey until everything is selected, then green */
+.tool-btn.select-all .sa-box { fill: var(--sa-fill, #f6f6f6); stroke: var(--sa-stroke, #b5b5b5); transition: fill 0.15s, stroke 0.15s; }
+.tool-btn.select-all .sa-check { stroke: var(--sa-stroke, #b5b5b5); transition: stroke 0.15s; }
+.tool-btn.select-all.on { --sa-fill: #dcf7e3; --sa-stroke: #34c759; }
+:root[data-base='dark'] .tool-btn.select-all { --sa-fill: rgba(255, 255, 255, 0.06); --sa-stroke: #8f8f8f; }
+:root[data-base='dark'] .tool-btn.select-all.on { --sa-fill: rgba(52, 199, 89, 0.22); --sa-stroke: #4cd964; }
 .view-switch .tool-btn { color: var(--text-3); }
 .view-switch .tool-btn svg { opacity: 0.75; }
 :root[data-base='dark'] { --act-resume: var(--link); --act-pause: #dc86cb; --act-delete: #ff6b72; }
