@@ -120,6 +120,16 @@ colors the window title bar to match.
 - Files are sorted into folders by type: Video, Music, Compressed, Documents, Programs
 - Copying a download link in any app opens *Add Link* (clipboard monitoring)
 - Canceled downloads stay in the list so you can restart them later
+- **Proxy:** HTTP, SOCKS5 or your system's proxy, with an optional login, for downloads, videos and updates
+  (Settings → Proxy, with a *Test connection* button)
+
+  <img src="docs/screenshots/settings-proxy.png" width="520" alt="Proxy settings" />
+
+- A **Last try** column in the compact list shows when each download was last attempted
+- After an update, a **What's new** window tells you what changed (Settings → About opens it again)
+
+  <img src="docs/screenshots/whats-new.png" width="320" alt="What's new window" />
+
 - Tray icon, progress on the taskbar button, notifications, and the PC stays awake while downloading
 - SHA-256 checksum of finished files
 - **Automatic updates**: KDM checks GitHub Releases, shows an *Update Available!* button in the sidebar, downloads

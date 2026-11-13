@@ -21,7 +21,7 @@ fs.writeFileSync(path.join(tools, 'ffmpeg'), '');
 
 async function launch(theme = 'light') {
   const ud = fs.mkdtempSync(path.join(os.tmpdir(), 'kdm-shots-'));
-  fs.writeFileSync(path.join(ud, 'settings.json'), JSON.stringify({ theme, notifications: false, clipboardWatch: false, showProgressWindow: false, connections: 8, videoQuality: '1080' }));
+  fs.writeFileSync(path.join(ud, 'settings.json'), JSON.stringify({ theme, notifications: false, clipboardWatch: false, showProgressWindow: false, connections: 8, videoQuality: '1080', lastSeenVersion: require('../package.json').version }));
   const app = await electron.launch({
     executablePath: require('electron'),
     args: [root, '--no-sandbox', '--force-device-scale-factor=2'],
@@ -111,7 +111,19 @@ const shot = async (page, name) => {
   await main.click('.nav-item[data-view="settings"]');
   await sleep(500);
   await shot(main, 'settings');
+  // proxy settings: manual proxy filled in so the fields are visible
+  await main.evaluate(() => window.api.invoke('settings:set', { proxy: { mode: 'manual', type: 'socks5', host: '127.0.0.1', port: 1080, username: '', password: '' } }));
+  await sleep(500);
+  await main.evaluate(() => document.getElementById('set-proxy').scrollIntoView({ block: 'start' }));
+  await sleep(500);
+  await shot(main, 'settings-proxy');
+  await main.evaluate(() => window.api.invoke('settings:set', { proxy: { mode: 'none' } }));
   await main.click('.nav-item[data-view="all"]');
+  // "What's new" window
+  const wn = await newWindow(app, () => main.evaluate(() => window.api.invoke('whatsnew:open')));
+  await sleep(500);
+  await shot(wn, 'whats-new');
+  await wn.close().catch(() => {});
 
   // add link -> file info
   let d = await newWindow(app, () => main.click('#addLink'));
