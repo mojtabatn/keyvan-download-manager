@@ -73,7 +73,7 @@ const shot = async (page, name) => {
 (async () => {
   const slow = await startServer(makeData(64 * 1024 * 1024, 5), { bytesPerSec: 260 * 1024 });
   const fast = await startServer(makeData(3 * 1024 * 1024, 9));
-  let { app, main } = await launch('light');
+  let { app, main } = await launch('day');
   const add = (o) => main.evaluate((x) => window.api.invoke('downloads:add', x), o);
   const act = (id, action) => main.evaluate((x) => window.api.invoke('downloads:action', x), { id, action });
 
@@ -99,7 +99,7 @@ const shot = async (page, name) => {
     await sleep(500);
     await shot(main, `theme-${t}`);
   }
-  await main.evaluate(() => window.api.invoke('settings:set', { theme: 'light' }));
+  await main.evaluate(() => window.api.invoke('settings:set', { theme: 'day' }));
   await sleep(400);
 
   // queue + scheduler
@@ -167,7 +167,7 @@ const shot = async (page, name) => {
   await app.close();
 
   // browser: video button + extension popup
-  ({ app, main } = await launch('light'));
+  ({ app, main } = await launch('day'));
   const site = http.createServer((req, res) => {
     if (req.url === '/') {
       res.writeHead(200, { 'Content-Type': 'text/html' });
