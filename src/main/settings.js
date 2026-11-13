@@ -17,7 +17,6 @@ function defaults(downloadsDir) {
     // How KDM reaches the internet. 'system' follows the operating system's proxy.
     proxy: { mode: 'none', type: 'http', host: '', port: 0, username: '', password: '', passwordEnc: '' },
     lastSeenVersion: null, // the version whose "What's new" was shown last
-    language: null, // 'en' | 'fa'; null = pick from the system language on first start
     listView: 'cards', // 'cards' (large icons) | 'compact' (list without icons)
     videoQuality: 'best', // preselected quality: 'best' | '2160' | '1080' | '720' | '480' | '360' | 'audio'
     autoUpdate: true, // check GitHub Releases for new versions
@@ -202,7 +201,6 @@ function sanitizePatch(p) {
   if ('maxRetries' in out) out.maxRetries = clamp(out.maxRetries, 0, 100, 10);
   if ('theme' in out && !THEME_IDS.includes(out.theme)) delete out.theme;
   if ('lastSeenVersion' in out) out.lastSeenVersion = /^\d+\.\d+\.\d+$/.test(String(out.lastSeenVersion)) ? String(out.lastSeenVersion) : null;
-  if ('language' in out && !['en', 'fa'].includes(out.language)) delete out.language;
   if ('listView' in out && !['cards', 'compact'].includes(out.listView)) delete out.listView;
   if ('videoQuality' in out && !['best', '2160', '1080', '720', '480', '360', 'audio'].includes(String(out.videoQuality))) delete out.videoQuality;
   return out;

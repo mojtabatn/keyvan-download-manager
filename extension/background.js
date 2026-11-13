@@ -1,5 +1,4 @@
 // KDM (Keyvan Download Manager) — browser integration (Chrome / Edge / Brave, Manifest V3)
-importScripts('i18n.js');
 const APP = 'http://127.0.0.1:17842';
 const DEFAULTS = { enabled: true, minSizeKB: 512 };
 const SKIP_MIME = /^(image\/|text\/(html|css|javascript|plain)|application\/(json|javascript|xml|x-javascript|pdf))/i;
@@ -31,12 +30,7 @@ async function ping(timeout = 400) {
     const r = await fetch(`${APP}/ping`, { signal: ctl.signal });
     clearTimeout(t);
     const j = await r.json();
-    if (j && j.app === 'download-manager') {
-      // the app tells us its language: remember it for the popup, the video button and the menus
-      if ((j.lang === 'fa' ? 'fa' : 'en') !== KDM_I18N.lang()) chrome.storage.local.set({ lang: j.lang === 'fa' ? 'fa' : 'en' });
-      return j;
-    }
-    return null;
+    return j && j.app === 'download-manager' ? j : null;
   } catch {
     return null;
   }
@@ -104,21 +98,13 @@ chrome.downloads.onCreated.addListener(async (item) => {
 });
 
 // ---------------------------------------------------------------- context menu
-function buildMenus() {
-  const t = KDM_I18N.t;
+chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.removeAll(() => {
-    chrome.contextMenus.create({ id: 'dm-link', title: t('Download with KDM'), contexts: ['link'] });
-    chrome.contextMenus.create({ id: 'dm-media', title: t('Download this media with KDM'), contexts: ['video', 'audio', 'image'] });
-    chrome.contextMenus.create({ id: 'dm-all', title: t('Download all links with KDM'), contexts: ['page'] });
+    chrome.contextMenus.create({ id: 'dm-link', title: 'Download with KDM', contexts: ['link'] });
+    chrome.contextMenus.create({ id: 'dm-media', title: 'Download this media with KDM', contexts: ['video', 'audio', 'image'] });
+    chrome.contextMenus.create({ id: 'dm-all', title: 'Download all links with KDM', contexts: ['page'] });
   });
-}
-chrome.runtime.onInstalled.addListener(() => KDM_I18N.init().then(buildMenus));
-chrome.runtime.onStartup.addListener(() => KDM_I18N.init().then(buildMenus));
-// the app's language changed: new menu titles
-chrome.storage.onChanged.addListener((ch, area) => {
-  if (area === 'local' && ch.lang) KDM_I18N.init().then(buildMenus);
 });
-KDM_I18N.init();
 
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (info.menuItemId === 'dm-all') return sendAllLinks(tab);

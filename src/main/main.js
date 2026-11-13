@@ -36,7 +36,6 @@ const proxyConfig = require('./engine/proxy');
 const { testConnection } = require('./engine/http');
 const I18N = require('../shared/i18n');
 const WHATS_NEW = require('../shared/whats-new');
-require('../shared/locale-fa');
 const { t, digits: D } = I18N;
 
 const APP_ID = 'com.mojtaba.kdm';
@@ -122,10 +121,7 @@ app.whenReady().then(() => {
     resolveSystem: (url) => session.defaultSession.resolveProxy(url),
   });
   nativeTheme.themeSource = nativeThemeSource(settings.get().theme);
-  // language: the saved one, or (first start) the system's if we have it
-  if (!settings.get().language) settings.set({ language: I18N.fromLocale(app.getLocale()) });
-  I18N.setLang(settings.get().language);
-  windows = new Windows(theme, () => I18N.getLang());
+  windows = new Windows(theme);
   buildAppMenu();
 
   // yt-dlp + ffmpeg for video downloads live next to the user's data (downloaded on first use)
@@ -160,7 +156,7 @@ app.whenReady().then(() => {
     version: app.getVersion(),
     isEnabled: () => settings.get().browserIntegration,
     onDownload: (p) => openFromBrowser(p),
-    extra: () => ({ videoButton: settings.get().videoButton !== false, lang: I18N.getLang() }),
+    extra: () => ({ videoButton: settings.get().videoButton !== false }),
   });
 
   clip = watchClipboard({
@@ -515,13 +511,6 @@ function onSettingsChanged(s, prev) {
   if (JSON.stringify(s.proxy) !== JSON.stringify(prev.proxy)) {
     proxyConfig.configure({}); // forget cached system-proxy answers
     applyElectronProxy();
-  }
-  if (s.language !== prev.language) {
-    I18N.setLang(s.language);
-    windows.reloadAll();
-    refreshTrayMenu();
-    if (tray) tray.setToolTip(t('Keyvan Download Manager'));
-    buildAppMenu();
   }
   if (s.theme !== prev.theme) {
     nativeTheme.themeSource = nativeThemeSource(s.theme);

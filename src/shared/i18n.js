@@ -10,16 +10,13 @@
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.I18N = api;
 })(typeof self !== 'undefined' ? self : this, function () {
-  const LANGS = [
-    { id: 'en', name: 'English', dir: 'ltr' },
-    { id: 'fa', name: 'فارسی', dir: 'rtl' },
-  ];
+  // English only for now. Another language is added by registering its texts (register) and listing it here.
+  const LANGS = [{ id: 'en', name: 'English', dir: 'ltr' }];
   const dicts = {};
   let lang = 'en';
 
   const known = (id) => LANGS.some((l) => l.id === id);
-  const PERSIAN_DIGITS = '۰۱۲۳۴۵۶۷۸۹';
-
+  
   /** Picks the language for a system locale such as "fa-IR" or "en-US". */
   function fromLocale(locale) {
     const id = String(locale || '').toLowerCase().split(/[-_]/)[0];
@@ -52,26 +49,19 @@
   /** True when the current language has a translation for this text. */
   const has = (key) => !!dicts[lang] && Object.prototype.hasOwnProperty.call(dicts[lang], key);
 
-  /** Latin digits → the language's own digits (Persian), and . → ٫ between digits. */
-  function digits(text) {
-    if (lang !== 'fa') return String(text);
-    return String(text)
-      .replace(/(\d)\.(?=\d)/g, '$1٫')
-      .replace(/\d/g, (d) => PERSIAN_DIGITS[d])
-      .replace(/([۰-۹])%/g, '$1٪');
-  }
+  const digits = (text) => String(text);
 
-  /** A version number such as 0.2.0: Persian digits, ordinary dots. */
-  const ver = (v) => digits(v).replace(/٫/g, '.');
+  /** A version number such as 0.2.0. */
+  const ver = (v) => String(v);
 
   /** A date + time for "Last try" etc.: Persian uses the Jalali calendar. */
   function dateTime(ms, opts = {}) {
     if (!(ms > 0)) return '—';
     const d = new Date(ms);
-    const locale = lang === 'fa' ? 'fa-IR' : 'sv-SE'; // sv-SE prints 2026-11-13 07:26
+    const locale = 'sv-SE'; // prints 2026-11-13 07:26
     const o = { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false, ...opts };
     try {
-      return new Intl.DateTimeFormat(locale, o).format(d).replace(/[،,]\u200f?\s*/, ' ');
+      return new Intl.DateTimeFormat(locale, o).format(d);
     } catch {
       return d.toLocaleString();
     }

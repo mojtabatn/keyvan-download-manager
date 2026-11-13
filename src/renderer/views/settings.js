@@ -84,7 +84,7 @@ window.SettingsView = (function () {
     const btn = el('button', { class: 'btn btn-outline text-only', style: 'height:30px;padding:0 12px;font-size:13px', text: 'Check now' });
     const show = (st) => {
       if (!st) return;
-      const when = st.checkedAt ? DM.digits(new Date(st.checkedAt).toLocaleTimeString(DM.FA ? 'fa-IR' : [], { hour: '2-digit', minute: '2-digit' })) : '';
+      const when = st.checkedAt ? new Date(st.checkedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
       const text = {
         idle: t('Not checked yet.'),
         checking: t('Checking…'),
@@ -236,7 +236,6 @@ window.SettingsView = (function () {
       group(
         'General',
         'general',
-        row('Language', 'The app reloads to show the new language.', select(I18N.LANGS.map((l) => [l.id, l.name]), (x) => x.language || 'en', (v) => save({ language: v }))),
         row('Keep running in the tray', 'Closing the window keeps downloads going.', toggle((x) => x.closeToTray, (v) => save({ closeToTray: v }))),
         row(/Macintosh/.test(navigator.userAgent) ? 'Open at login' : 'Launch at Windows startup', /Macintosh/.test(navigator.userAgent) ? 'Starts in the menu bar.' : 'Starts minimized to the tray.', toggle((x) => x.launchAtStartup, (v) => save({ launchAtStartup: v }))),
         row('Notifications', 'Show a notification when a download finishes or fails.', toggle((x) => x.notifications, (v) => save({ notifications: v })))

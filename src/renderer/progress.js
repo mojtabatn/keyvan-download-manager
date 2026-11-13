@@ -172,13 +172,7 @@
     requestAnimationFrame(() => {
       const first = done ? $('openFile') : toggle;
       const left = 24 + first.offsetWidth + 8;
-      // the button row starts at the leading edge: the left in English, the right in Persian
-      const edge = DM.FA ? 'right' : 'left';
-      const other = DM.FA ? 'left' : 'right';
-      const put = (e, px) => {
-        e.style[other] = '';
-        e.style[edge] = `${px}px`;
-      };
+      const put = (e, px) => (e.style.left = `${px}px`);
       if (done) {
         put($('openFolder'), left);
         put($('cancel'), left + $('openFolder').offsetWidth + 8);

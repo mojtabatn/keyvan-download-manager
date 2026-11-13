@@ -47,13 +47,6 @@ const IS_MAC = document.documentElement.dataset.platform === 'mac';
     renderQueuePanel();
     if (pending) showPower(pending);
     SettingsView.mount($('view-settings'), settings, info);
-    // after a language change the window reloads: come back to the screen the user was on
-    try {
-      const v = sessionStorage.getItem('kdm.view');
-      if (v && v !== state.view && document.querySelector(`.nav-item[data-view="${v}"]`)) setView(v);
-    } catch {
-      /* no session storage */
-    }
   }
 
   api.on('downloads:added', (d) => {
@@ -449,11 +442,6 @@ const IS_MAC = document.documentElement.dataset.platform === 'mac';
 
   function setView(v) {
     state.view = v;
-    try {
-      sessionStorage.setItem('kdm.view', v);
-    } catch {
-      /* no session storage */
-    }
     for (const b of document.querySelectorAll('.nav-item')) b.classList.toggle('active', b.dataset.view === v);
     $('view-list').hidden = !(v === 'all' || v === 'completed');
     $('view-scheduled').hidden = v !== 'scheduled';
@@ -521,10 +509,10 @@ const IS_MAC = document.documentElement.dataset.platform === 'mac';
   });
 
   // ------------------------------------------------------------ scheduled / queue panel
-  const DAY = ['S', 'M', 'T', 'W', 'T', 'F', 'S']; // Sunday first; Persian shows the week from Saturday
+  const DAY = ['S', 'M', 'T', 'W', 'T', 'F', 'S']; // Sunday first
   const DAY_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  const DAY_ORDER = DM.FA ? [6, 0, 1, 2, 3, 4, 5] : [0, 1, 2, 3, 4, 5, 6];
-  const dayLetter = (i) => (DM.FA ? t(DAY_FULL[i]).charAt(0) : DAY[i]);
+  const DAY_ORDER = [0, 1, 2, 3, 4, 5, 6];
+  const dayLetter = (i) => DAY[i];
   const maxSel = $('schMax');
   for (let i = 1; i <= 10; i++) maxSel.append(el('option', { value: String(i), text: DM.n(i) }));
 

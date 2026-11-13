@@ -33,21 +33,12 @@ const THEMES = {
 };
 
 class Windows {
-  constructor(getTheme, getLang = () => 'en') {
+  constructor(getTheme) {
     this.getTheme = getTheme; // () => 'light' | 'dark'
-    this.getLang = getLang; // () => 'en' | 'fa'
     this.main = null;
     this.dialogs = new Set();
     this.progress = new Map(); // download id -> window
     this.player = null;
-  }
-
-  /** Reloads every window (after the language changed) so all text is drawn again in the new language. */
-  reloadAll() {
-    for (const w of this.all()) {
-      if (!w.__page || w.__kind === 'player') continue;
-      w.loadFile(path.join(RENDERER, w.__page), { query: { theme: this.getTheme(), lang: this.getLang(), ...w.__query } });
-    }
   }
 
   all() {
@@ -115,7 +106,7 @@ class Windows {
     win.__page = page;
     win.__query = query;
     win.setMenuBarVisibility(false);
-    win.loadFile(path.join(RENDERER, page), { query: { theme: this.getTheme(), lang: this.getLang(), ...query } });
+    win.loadFile(path.join(RENDERER, page), { query: { theme: this.getTheme(), ...query } });
     if (show) win.once('ready-to-show', () => this.reveal(win));
     // Never let a dropped link or stray anchor navigate the app away.
     win.webContents.on('will-navigate', (e, url) => {

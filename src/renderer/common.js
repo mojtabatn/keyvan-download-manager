@@ -15,13 +15,10 @@
   }
   setTheme(params.get('theme'));
 
-  // ---- language: the main process passes ?lang=fa|en; Persian is right-to-left
+  // ---- texts: all English for now (see shared/i18n.js for adding a language)
   const { t, digits } = I18N;
   I18N.setLang(params.get('lang') || 'en');
-  document.documentElement.lang = I18N.getLang();
-  document.documentElement.dir = I18N.dir();
-  document.documentElement.dataset.lang = I18N.getLang();
-  const FA = I18N.getLang() === 'fa';
+  const FA = false;
 
   /** Translates the page's fixed text (text nodes, title / placeholder / alt) once it has been parsed. */
   function translateDom(root = document.body) {
@@ -42,21 +39,7 @@
     if (document.title && I18N.has(document.title)) document.title = t(document.title);
   }
   const ready = (fn) => (document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', fn) : fn());
-  /** Right-to-left: swap the inline left / right positions the dialog pages are laid out with. */
-  function mirrorInline() {
-    if (!I18N.isRtl()) return;
-    for (const e of document.querySelectorAll('[style]')) {
-      const l = e.style.left;
-      const r = e.style.right;
-      if (!l && !r) continue;
-      e.style.left = r;
-      e.style.right = l;
-    }
-  }
-  ready(() => {
-    mirrorInline();
-    translateDom();
-  });
+  ready(() => translateDom());
   // macOS: traffic lights on the left of the title bar, ⌘ shortcuts
   if (/Macintosh/.test(navigator.userAgent)) document.documentElement.dataset.platform = 'mac';
   window.api.on('theme:changed', setTheme);
@@ -164,5 +147,5 @@
     return frag;
   }
 
-  window.DM = { v: I18N.ver, side: (px) => (I18N.isRtl() ? { right: px } : { left: px }), rich, t, digits, n: (x) => digits(String(x)), dateTime: I18N.dateTime, FA, translateDom, ready, params, setTheme, fmtBytes, fmtSpeed, fmtEta, fmtSizePair, pct, catIcon, el, icon, themedIcon, toast, splitUrls, MEDIA_EXT };
+  window.DM = { v: I18N.ver, rich, t, digits, n: (x) => digits(String(x)), dateTime: I18N.dateTime, FA, translateDom, ready, params, setTheme, fmtBytes, fmtSpeed, fmtEta, fmtSizePair, pct, catIcon, el, icon, themedIcon, toast, splitUrls, MEDIA_EXT };
 })();

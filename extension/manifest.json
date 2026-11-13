@@ -40,7 +40,6 @@
         "<all_urls>"
       ],
       "js": [
-        "i18n.js",
         "grabber.js"
       ],
       "run_at": "document_idle",
