@@ -32,6 +32,12 @@ const { PowerActions } = require('./power');
 const { Components } = require('./media/components');
 const { probeMedia, isVideoPage, FORMATS_MISSING } = require('./media/media');
 const { Updater } = require('./updater');
+const proxyConfig = require('./engine/proxy');
+const { testConnection } = require('./engine/http');
+const I18N = require('../shared/i18n');
+const WHATS_NEW = require('../shared/whats-new');
+require('../shared/locale-fa');
+const { t, digits: D } = I18N;
 
 const APP_ID = 'com.mojtaba.kdm';
 const ASSETS = path.join(__dirname, '..', 'renderer', 'assets');
@@ -61,28 +67,31 @@ if (!app.requestSingleInstanceLock()) {
 app.setAppUserModelId(APP_ID);
 const IS_MAC = process.platform === 'darwin';
 // Windows: no menu bar. macOS always shows one, and ⌘C / ⌘V / ⌘Q only work through it.
-Menu.setApplicationMenu(
-  IS_MAC
-    ? Menu.buildFromTemplate([
-        {
-          label: 'KDM',
-          submenu: [
-            { role: 'about', label: 'About Keyvan Download Manager' },
-            { type: 'separator' },
-            { label: 'Add Link…', accelerator: 'CmdOrCtrl+N', click: () => openAddDialog() },
-            { type: 'separator' },
-            { role: 'hide' },
-            { role: 'hideOthers' },
-            { role: 'unhide' },
-            { type: 'separator' },
-            { label: 'Quit KDM', accelerator: 'Cmd+Q', click: () => quit() },
-          ],
-        },
-        { role: 'editMenu' },
-        { role: 'windowMenu' },
-      ])
-    : null
-);
+function buildAppMenu() {
+  Menu.setApplicationMenu(
+    IS_MAC
+      ? Menu.buildFromTemplate([
+          {
+            label: 'KDM',
+            submenu: [
+              { role: 'about', label: t('About Keyvan Download Manager') },
+              { type: 'separator' },
+              { label: t('Add Link…'), accelerator: 'CmdOrCtrl+N', click: () => openAddDialog() },
+              { type: 'separator' },
+              { role: 'hide' },
+              { role: 'hideOthers' },
+              { role: 'unhide' },
+              { type: 'separator' },
+              { label: t('Quit KDM'), accelerator: 'Cmd+Q', click: () => quit() },
+            ],
+          },
+          { role: 'editMenu' },
+          { role: 'windowMenu' },
+        ])
+      : null
+  );
+}
+buildAppMenu();
 
 let settings;
 let manager;
@@ -107,9 +116,17 @@ const theme = () => resolveTheme(settings.get().theme);
 app.whenReady().then(() => {
   migrateFromOldName();
   const userData = app.getPath('userData');
-  settings = new Settings(path.join(userData, 'settings.json'), app.getPath('downloads'));
+  settings = new Settings(path.join(userData, 'settings.json'), app.getPath('downloads'), osSecrets());
+  proxyConfig.configure({
+    getConfig: () => settings.get().proxy,
+    resolveSystem: (url) => session.defaultSession.resolveProxy(url),
+  });
   nativeTheme.themeSource = nativeThemeSource(settings.get().theme);
-  windows = new Windows(theme);
+  // language: the saved one, or (first start) the system's if we have it
+  if (!settings.get().language) settings.set({ language: I18N.fromLocale(app.getLocale()) });
+  I18N.setLang(settings.get().language);
+  windows = new Windows(theme, () => I18N.getLang());
+  buildAppMenu();
 
   // yt-dlp + ffmpeg for video downloads live next to the user's data (downloaded on first use)
   tools = new Components(process.env.DM_TOOLS_DIR || path.join(userData, 'bin'));
@@ -135,6 +152,7 @@ app.whenReady().then(() => {
   createTray();
   applyLoginItem();
 
+  planWhatsNew();
   const hidden = process.argv.includes('--hidden');
   showMain({ show: !hidden });
 
@@ -142,7 +160,7 @@ app.whenReady().then(() => {
     version: app.getVersion(),
     isEnabled: () => settings.get().browserIntegration,
     onDownload: (p) => openFromBrowser(p),
-    extra: () => ({ videoButton: settings.get().videoButton !== false }),
+    extra: () => ({ videoButton: settings.get().videoButton !== false, lang: I18N.getLang() }),
   });
 
   clip = watchClipboard({
@@ -158,6 +176,7 @@ app.whenReady().then(() => {
     windows.broadcast('theme:changed', theme());
   });
 
+  applyElectronProxy();
   startUpdater();
   // keep yt-dlp current in the background (video sites change their pages often)
   setTimeout(() => tools.ready() && tools.updateIfStale(3 * 24 * 3600 * 1000).catch(() => {}), 20000);
@@ -167,6 +186,14 @@ app.whenReady().then(() => {
 // macOS: clicking the Dock icon brings the window back
 app.on('activate', () => {
   if (windows) showMain();
+});
+
+// a proxy that asks for a username and password (Chromium's own requests, e.g. the player window)
+app.on('login', (e, _wc, _req, authInfo, callback) => {
+  const p = settings && settings.get().proxy;
+  if (!authInfo.isProxy || !p || p.mode !== 'manual' || !p.username) return;
+  e.preventDefault();
+  callback(p.username, p.password || '');
 });
 
 app.on('second-instance', (_e, argv) => {
@@ -214,6 +241,31 @@ function migrateFromOldName() {
   }
 }
 
+/** Readable text for what can go wrong when connecting through a proxy. */
+function proxyError(e) {
+  const m = String((e && e.message) || e);
+  if (/407/.test(m)) return t('The proxy rejected the username or password.');
+  if (/ECONNREFUSED/.test(m)) return t('The proxy refused the connection. Check the address and port.');
+  if (/ENOTFOUND|EAI_AGAIN/.test(m)) return t('The proxy address was not found.');
+  if (/ETIMEDOUT|timed out/i.test(m)) return t('The proxy did not answer in time.');
+  if (/socks/i.test(m) && /auth/i.test(m)) return t('The proxy rejected the username or password.');
+  return m.slice(0, 200);
+}
+
+/**
+ * The player window ("Online Watch") and Electron itself use Chromium's network stack, which has its
+ * own proxy setting: keep it in line with the one downloads use.
+ */
+function applyElectronProxy() {
+  const p = settings.get().proxy;
+  let cfg = { mode: 'direct' };
+  if (p.mode === 'system') cfg = { mode: 'system' };
+  else if (p.mode === 'manual' && p.host && p.port > 0) {
+    cfg = { mode: 'fixed_servers', proxyRules: p.type === 'socks5' ? `socks5://${p.host}:${p.port}` : `http://${p.host}:${p.port}`, proxyBypassRules: '<local>' };
+  }
+  for (const ses of [session.defaultSession, session.fromPartition('persist:player')]) ses.setProxy(cfg).catch(() => {});
+}
+
 /**
  * Encryption by the operating system (Windows DPAPI, macOS Keychain, Linux keyring) for the browser
  * cookies saved with unfinished downloads. null when no real key store is available: then cookies
@@ -257,13 +309,32 @@ function hookMainClose() {
     if (!trayHintShown && Notification.isSupported()) {
       trayHintShown = true;
       new Notification({
-        title: 'Keyvan Download Manager is still running',
-        body: 'Downloads continue in the background. Right-click the tray icon to quit.',
+        title: t('Keyvan Download Manager is still running'),
+        body: t('Downloads continue in the background. Right-click the tray icon to quit.'),
         icon: path.join(ASSETS, 'app-256.png'),
         silent: true,
       }).show();
     }
   });
+}
+
+/** After an update, "What's new" opens once, the first time the main window is shown. */
+let whatsNewPending = null;
+function planWhatsNew() {
+  const cur = app.getVersion();
+  const forced = process.env.DM_WHATS_NEW; // development: pretend this was the last version seen
+  const last = forced !== undefined ? forced || null : settings.get().lastSeenVersion;
+  if (forced === undefined && settings.isFirstRun) return void settings.set({ lastSeenVersion: cur }); // new install: nothing to explain
+  if (last === cur) return;
+  if ((last && WHATS_NEW.cmp(last, cur) > 0) || !WHATS_NEW.between(last, cur).length) return void settings.set({ lastSeenVersion: cur });
+  whatsNewPending = { from: last || '', to: cur };
+}
+function showWhatsNewIfDue() {
+  if (!whatsNewPending) return;
+  const q = whatsNewPending;
+  whatsNewPending = null;
+  settings.set({ lastSeenVersion: q.to });
+  setTimeout(() => windows.openWhatsNew(q), 700);
 }
 
 function showMain({ show = true } = {}) {
@@ -272,6 +343,7 @@ function showMain({ show = true } = {}) {
     w.__closeHooked = true;
     hookMainClose();
   }
+  if (show) showWhatsNewIfDue();
 }
 
 // ---------------------------------------------------------------- manager -> UI
@@ -297,21 +369,21 @@ function wireManagerEvents() {
     const progressOpen = windows.progress.has(s.id);
     if (progressOpen && !s0.showCompleteWindow) windows.closeProgress(s.id);
     if (s0.notifications && Notification.isSupported() && !(progressOpen && s0.showCompleteWindow)) {
-      const n = new Notification({ title: 'Download complete', body: s.filename, icon: path.join(ASSETS, 'app-256.png') });
+      const n = new Notification({ title: t('Download complete'), body: s.filename, icon: path.join(ASSETS, 'app-256.png') });
       n.on('click', () => shell.showItemInFolder(s.savePath));
       n.show();
     }
   });
   manager.on('failed', (s) => {
     if (settings.get().notifications && Notification.isSupported() && !windows.progress.has(s.id)) {
-      new Notification({ title: 'Download failed', body: `${s.filename}\n${s.error || ''}`, icon: path.join(ASSETS, 'app-256.png') }).show();
+      new Notification({ title: t('Download failed'), body: `${s.filename}\n${s.error || ''}`, icon: path.join(ASSETS, 'app-256.png') }).show();
     }
   });
   manager.on('activity', (a) => {
     lastActivity = a;
     updateTaskbar(a);
     updateSleepBlocker(a.active > 0);
-    if (tray) tray.setToolTip(a.active ? `KDM — ${a.active} active · ${fmtSpeed(a.speed)}` : 'Keyvan Download Manager');
+    if (tray) tray.setToolTip(a.active ? t('KDM — {n} active · {speed}', { n: D(a.active), speed: fmtSpeed(a.speed) }) : t('Keyvan Download Manager'));
   });
 }
 
@@ -333,8 +405,8 @@ function updateSleepBlocker(active) {
 }
 
 function fmtSpeed(bps) {
-  if (bps >= 1024 * 1024) return `${(bps / 1048576).toFixed(1)} MB/s`;
-  return `${Math.round(bps / 1024)} KB/s`;
+  if (bps >= 1024 * 1024) return D(`${(bps / 1048576).toFixed(1)} ${t('MB')}/${t('s')}`);
+  return D(`${Math.round(bps / 1024)} ${t('KB')}/${t('s')}`);
 }
 
 // ---------------------------------------------------------------- dialogs
@@ -410,25 +482,27 @@ function createTray() {
   refreshTrayMenu();
 }
 
+const POWER_LABELS = { exit: 'Exit app', sleep: 'Sleep', hibernate: 'Hibernate', shutdown: 'Shut down' };
+
 function queueTrayItems() {
   const queues = manager.queues();
-  const item = (q, label) => (manager.qstate(q.id).running ? { label: `Stop ${label}`, click: () => manager.stopQueue(q.id) } : { label: `Start ${label}`, click: () => manager.startQueue(q.id) });
-  if (queues.length === 1) return [item(queues[0], 'queue')];
-  return [{ label: 'Queues', submenu: queues.map((q) => item(q, `“${q.name}”`)) }];
+  const item = (q, name) => (manager.qstate(q.id).running ? { label: t('Stop {name}', { name }), click: () => manager.stopQueue(q.id) } : { label: t('Start {name}', { name }), click: () => manager.startQueue(q.id) });
+  if (queues.length === 1) return [item(queues[0], t('queue'))];
+  return [{ label: t('Queues'), submenu: queues.map((q) => item(q, `“${t(q.name)}”`)) }];
 }
 
 function refreshTrayMenu() {
   if (!tray) return;
   const items = [
-    { label: 'Open KDM', click: () => showMain() },
-    { label: 'Add Link…', click: () => openAddDialog() },
+    { label: t('Open KDM'), click: () => showMain() },
+    { label: t('Add Link…'), click: () => openAddDialog() },
     { type: 'separator' },
-    { label: 'Pause all', click: () => manager.pauseAll() },
-    { label: 'Resume all', click: () => manager.resumeAll() },
+    { label: t('Pause all'), click: () => manager.pauseAll() },
+    { label: t('Resume all'), click: () => manager.resumeAll() },
     ...queueTrayItems(),
   ];
-  if (power && power.pending) items.push({ type: 'separator' }, { label: `Cancel ${power.pending.action}`, click: () => power.cancel() });
-  items.push({ type: 'separator' }, { label: 'Quit', click: () => quit() });
+  if (power && power.pending) items.push({ type: 'separator' }, { label: t('Cancel {action}', { action: t(POWER_LABELS[power.pending.action] || power.pending.action) }), click: () => power.cancel() });
+  items.push({ type: 'separator' }, { label: t('Quit'), click: () => quit() });
   tray.setContextMenu(Menu.buildFromTemplate(items));
 }
 
@@ -438,6 +512,17 @@ function applyLoginItem() {
 }
 
 function onSettingsChanged(s, prev) {
+  if (JSON.stringify(s.proxy) !== JSON.stringify(prev.proxy)) {
+    proxyConfig.configure({}); // forget cached system-proxy answers
+    applyElectronProxy();
+  }
+  if (s.language !== prev.language) {
+    I18N.setLang(s.language);
+    windows.reloadAll();
+    refreshTrayMenu();
+    if (tray) tray.setToolTip(t('Keyvan Download Manager'));
+    buildAppMenu();
+  }
   if (s.theme !== prev.theme) {
     nativeTheme.themeSource = nativeThemeSource(s.theme);
     windows.applyTheme();
@@ -448,7 +533,7 @@ function onSettingsChanged(s, prev) {
   if (s.maxConcurrent !== prev.maxConcurrent) manager.pump();
   if (s.autoUpdate !== prev.autoUpdate) startUpdater();
   if (s.preventSleep !== prev.preventSleep) updateSleepBlocker(lastActivity.active > 0);
-  windows.broadcast('settings:changed', s);
+  windows.broadcast('settings:changed', settings.forRenderer());
   // after the windows have the new settings, so they know every queue that is reported
   if (JSON.stringify(s.queues) !== JSON.stringify(prev.queues)) {
     // a queue was added / renamed / deleted or its "at a time" changed
@@ -497,11 +582,11 @@ async function confirmRemove(win, snap) {
   const done = snap.status === 'completed';
   const { response } = await dialog.showMessageBox(win, {
     type: 'question',
-    buttons: ['Remove', 'Keep'],
+    buttons: [t('Remove'), t('Keep')],
     defaultId: 1,
     cancelId: 1,
-    title: 'Keyvan Download Manager',
-    message: `Remove “${snap.filename}” from the list?`,
+    title: t('Keyvan Download Manager'),
+    message: t('Remove “{name}” from the list?', { name: snap.filename }),
     detail: done ? 'The downloaded file stays on your disk.' : 'The partially downloaded data will be deleted.',
     noLink: true,
   });
@@ -516,20 +601,20 @@ async function deleteMany(win, ids) {
   const onDisk = done.filter((s) => fs.existsSync(s.savePath));
   const unfinished = items.length - done.length;
   const lines = [];
-  if (done.length) lines.push(`${done.length} finished download${done.length > 1 ? 's' : ''} will be removed from the list.`);
-  if (unfinished) lines.push(`${unfinished} unfinished download${unfinished > 1 ? 's' : ''} will stop, and their partially downloaded data will be deleted.`);
+  if (done.length) lines.push(t(done.length > 1 ? '{n} finished downloads will be removed from the list.' : '{n} finished download will be removed from the list.', { n: D(done.length) }));
+  if (unfinished) lines.push(t(unfinished > 1 ? '{n} unfinished downloads will stop, and their partially downloaded data will be deleted.' : '{n} unfinished download will stop, and its partially downloaded data will be deleted.', { n: D(unfinished) }));
   const opts = {
     type: 'question',
-    buttons: [`Delete ${items.length}`, 'Cancel'],
+    buttons: [t('Delete {n}', { n: D(items.length) }), t('Cancel')],
     defaultId: 1,
     cancelId: 1,
     noLink: true,
-    title: 'Keyvan Download Manager',
-    message: `Delete ${items.length} downloads?`,
+    title: t('Keyvan Download Manager'),
+    message: t('Delete {n} downloads?', { n: D(items.length) }),
     detail: lines.join('\n'),
   };
   if (onDisk.length) {
-    opts.checkboxLabel = `Also delete ${onDisk.length === 1 ? 'the downloaded file' : `the ${onDisk.length} downloaded files`} from disk`;
+    opts.checkboxLabel = onDisk.length === 1 ? t('Also delete the downloaded file from disk') : t('Also delete the {n} downloaded files from disk', { n: D(onDisk.length) });
     opts.checkboxChecked = false;
   }
   const { response, checkboxChecked } = await dialog.showMessageBox(win, opts);
@@ -572,12 +657,12 @@ async function runAction(win, { id, action, value }) {
       const done = s.status === 'completed';
       const opts = {
         type: 'question',
-        buttons: ['Delete', 'Cancel'],
+        buttons: [t('Delete'), t('Cancel')],
         defaultId: 1,
         cancelId: 1,
         noLink: true,
-        title: 'Keyvan Download Manager',
-        message: `Delete “${s.filename}”?`,
+        title: t('Keyvan Download Manager'),
+        message: t('Delete “{name}”?', { name: s.filename }),
         detail: done ? 'It will be removed from the list.' : 'The download stops and is removed from the list; the partially downloaded data is deleted.',
       };
       if (done && fs.existsSync(s.savePath)) {
@@ -591,10 +676,10 @@ async function runAction(win, { id, action, value }) {
     case 'deleteFile': {
       const { response } = await dialog.showMessageBox(win, {
         type: 'warning',
-        buttons: ['Delete', 'Keep'],
+        buttons: [t('Delete'), t('Keep')],
         defaultId: 1,
         cancelId: 1,
-        message: `Delete “${s.filename}” from disk?`,
+        message: t('Delete “{name}” from disk?', { name: s.filename }),
         detail: s.savePath,
         noLink: true,
       });
@@ -615,7 +700,7 @@ async function runAction(win, { id, action, value }) {
     case 'copyUrl':
       clipboard.writeText(s.url);
       clip?.ignore(s.url);
-      windows.broadcast('toast', { text: 'Address copied' });
+      windows.broadcast('toast', { text: t('Address copied') });
       break;
     case 'redownload':
       await manager.redownload(id);
@@ -644,14 +729,14 @@ async function runAction(win, { id, action, value }) {
       manager.update(id, { [action]: Number(value) || 0 });
       break;
     case 'hash': {
-      windows.broadcast('toast', { text: 'Calculating SHA-256…' });
+      windows.broadcast('toast', { text: t('Calculating SHA-256…') });
       try {
         const h = await sha256(s.savePath);
         clipboard.writeText(h);
         clip?.ignore(h);
-        windows.broadcast('toast', { text: `SHA-256 copied: ${h.slice(0, 16)}…` });
+        windows.broadcast('toast', { text: t('SHA-256 copied: {h}…', { h: h.slice(0, 16) }) });
       } catch (e) {
-        windows.broadcast('toast', { text: `Couldn't read file: ${e.message}` });
+        windows.broadcast('toast', { text: t('Couldn’t read file: {e}', { e: e.message }) });
       }
       break;
     }
@@ -668,34 +753,34 @@ function contextMenuFor(win, id) {
   const done = s.status === 'completed';
   const act = (action, value) => () => runAction(win, { id, action, value });
   const tpl = [];
-  if (done) tpl.push({ label: 'Open', click: act('open') });
-  tpl.push({ label: 'Open folder', click: act('openFolder') });
+  if (done) tpl.push({ label: t('Open'), click: act('open') });
+  tpl.push({ label: t('Open folder'), click: act('openFolder') });
   tpl.push({ type: 'separator' });
   if (!done) {
-    if (dl.running) tpl.push({ label: 'Pause', click: act('pause') });
-    else tpl.push({ label: s.status === 'error' ? 'Retry' : 'Resume', click: act('start') });
-    if (s.status === 'canceled') tpl.push({ label: 'Restart from beginning', click: act('redownload') });
-    tpl.push({ label: 'Show progress window', click: act('progress') });
+    if (dl.running) tpl.push({ label: t('Pause'), click: act('pause') });
+    else tpl.push({ label: t(s.status === 'error' ? 'Retry' : 'Resume'), click: act('start') });
+    if (s.status === 'canceled') tpl.push({ label: t('Restart from beginning'), click: act('redownload') });
+    tpl.push({ label: t('Show progress window'), click: act('progress') });
     const queues = manager.queues();
     if (queues.length === 1) tpl.push({ label: s.queued ? 'Remove from queue' : 'Add to queue', click: act('queue', s.queued ? false : 'main') });
     else {
       const current = s.queued ? s.queueId || 'main' : null;
       tpl.push({
-        label: s.queued ? 'Move to queue' : 'Add to queue',
-        submenu: queues.map((q) => ({ label: q.name, type: 'radio', checked: q.id === current, click: act('queue', q.id) })),
+        label: t(s.queued ? 'Move to queue' : 'Add to queue'),
+        submenu: queues.map((q) => ({ label: t(q.name), type: 'radio', checked: q.id === current, click: act('queue', q.id) })),
       });
-      if (s.queued) tpl.push({ label: 'Remove from queue', click: act('queue', false) });
+      if (s.queued) tpl.push({ label: t('Remove from queue'), click: act('queue', false) });
     }
-    if (s.queued) tpl.push({ label: 'Move up in queue', click: act('moveUp') }, { label: 'Move down in queue', click: act('moveDown') });
+    if (s.queued) tpl.push({ label: t('Move up in queue'), click: act('moveUp') }, { label: t('Move down in queue'), click: act('moveDown') });
     tpl.push({ type: 'separator' });
   }
-  tpl.push({ label: 'Copy address', click: act('copyUrl') });
-  if (!done) tpl.push({ label: 'Refresh link…', click: act('refresh') });
-  if (done) tpl.push({ label: 'Download again', click: act('redownload') }, { label: 'Copy SHA-256 checksum', click: act('hash') });
+  tpl.push({ label: t('Copy address'), click: act('copyUrl') });
+  if (!done) tpl.push({ label: t('Refresh link…'), click: act('refresh') });
+  if (done) tpl.push({ label: t('Download again'), click: act('redownload') }, { label: t('Copy SHA-256 checksum'), click: act('hash') });
   tpl.push({ type: 'separator' });
-  if (done) tpl.push({ label: 'Remove from list', click: act('remove') }, { label: 'Delete file…', click: act('deleteFile') });
-  else if (s.status === 'canceled') tpl.push({ label: 'Remove from list…', click: act('remove') });
-  else tpl.push({ label: 'Cancel download', click: act('cancel') }, { label: 'Remove from list…', click: act('remove') });
+  if (done) tpl.push({ label: t('Remove from list'), click: act('remove') }, { label: t('Delete file…'), click: act('deleteFile') });
+  else if (s.status === 'canceled') tpl.push({ label: t('Remove from list…'), click: act('remove') });
+  else tpl.push({ label: t('Cancel download'), click: act('cancel') }, { label: t('Remove from list…'), click: act('remove') });
   Menu.buildFromTemplate(tpl).popup({ window: win });
 }
 
@@ -709,8 +794,29 @@ function registerIpc() {
     downloads: app.getPath('downloads'),
     extensionDir: extensionDir(),
   }));
-  h('settings:get', () => settings.get());
-  h('settings:set', (_e, patch) => settings.set(patch || {}));
+  h('settings:get', () => settings.forRenderer());
+  h('settings:set', (_e, patch) => {
+    settings.set(patch || {});
+    return settings.forRenderer();
+  });
+  /** "Test" in the proxy settings: a tiny request through the proxy exactly as typed (not saved yet). */
+  h('proxy:test', async (_e, form = {}) => {
+    const testUrl = 'https://www.gstatic.com/generate_204';
+    try {
+      let px = null;
+      const saved = settings.get().proxy;
+      if (form.mode === 'manual') {
+        if (!form.host || !(Number(form.port) > 0)) return { ok: false, error: t('Enter the proxy address and port first.') };
+        px = { type: form.type === 'socks5' ? 'socks5' : 'http', host: String(form.host), port: Number(form.port), username: form.username || '', password: form.password || (form.username && form.username === saved.username ? saved.password : '') };
+      } else if (form.mode === 'system') {
+        px = proxyConfig.parsePac(await session.defaultSession.resolveProxy(testUrl));
+      }
+      const r = await testConnection(px, testUrl);
+      return { ok: r.ok, ms: r.ms, via: px ? proxyConfig.describe(px) : '' };
+    } catch (e) {
+      return { ok: false, error: proxyError(e) };
+    }
+  });
 
   h('downloads:list', () => manager.list());
   h('downloads:detail', (_e, id) => manager.get(id)?.detail() || null);
@@ -743,13 +849,13 @@ function registerIpc() {
     const main = manager.queues()[0];
     const { response } = await dialog.showMessageBox(senderWindow(e), {
       type: 'question',
-      buttons: ['Delete queue', 'Cancel'],
+      buttons: [t('Delete queue'), t('Cancel')],
       defaultId: 1,
       cancelId: 1,
       noLink: true,
-      title: 'Keyvan Download Manager',
-      message: `Delete the queue “${q.name}”?`,
-      detail: n ? `Its ${n} download${n > 1 ? 's' : ''} will move to “${main.name}”. Nothing is deleted from your disk.` : 'The queue is empty.',
+      title: t('Keyvan Download Manager'),
+      message: t('Delete the queue “{name}”?', { name: t(q.name) }),
+      detail: n ? t(n > 1 ? 'Its {n} downloads will move to “{main}”. Nothing is deleted from your disk.' : 'Its {n} download will move to “{main}”. Nothing is deleted from your disk.', { n: D(n), main: t(main.name) }) : t('The queue is empty.'),
     });
     if (response !== 0) return false;
     await manager.deleteQueue(id);
@@ -763,7 +869,7 @@ function registerIpc() {
     return new Promise((resolve) => {
       let picked = null;
       const menu = Menu.buildFromTemplate([
-        { label: 'Add to queue', enabled: false },
+        { label: t('Add to queue'), enabled: false },
         ...queues.map((q) => ({ label: q.name, click: () => (picked = q.id) })),
       ]);
       menu.popup({ window: senderWindow(e), callback: () => setTimeout(() => resolve(picked), 0) });
@@ -782,7 +888,7 @@ function registerIpc() {
   });
   h('dialog:pickFolder', async (e, current) => {
     const r = await dialog.showOpenDialog(senderWindow(e), {
-      title: 'Choose a folder',
+      title: t('Choose a folder'),
       defaultPath: current || settings.get().downloadDir,
       properties: ['openDirectory', 'createDirectory'],
     });
@@ -839,7 +945,7 @@ function registerIpc() {
     try {
       return await tools.install((p) => windows.broadcast('media:install-progress', p));
     } catch (e) {
-      return { error: `Couldn't download video support: ${e.message}` };
+      return { error: t('Couldn’t download video support: {e}', { e: e.message }) };
     }
   });
   h('media:update', async () => {
@@ -869,7 +975,7 @@ function registerIpc() {
     let found = await tryAll();
     // Sites like YouTube change often; an outdated yt-dlp is the usual cause. Update once and retry.
     if (!found && lastError === FORMATS_MISSING && (await tools.updateIfStale(60 * 60 * 1000))) found = await tryAll();
-    return found || { error: lastError };
+    return found || { error: t(lastError) };
   });
   h('update:state', () => (updater ? updater.state : null));
   h('update:check', () => (updater ? updater.check() : null));
@@ -880,12 +986,13 @@ function registerIpc() {
     if (url) shell.openExternal(url);
     return !!url;
   });
-  h('shell:openProject', () => {
+  h('shell:openProject', (_e, what) => {
     const url = projectUrl();
     if (!url) return false;
-    shell.openExternal(url);
+    shell.openExternal(what === 'releases' ? `${url}/releases` : url);
     return true;
   });
+  h('whatsnew:open', () => !!windows.openWhatsNew({ from: '', to: app.getVersion() }));
 }
 
 /** The project's GitHub page (package.json "homepage"); only https GitHub links are opened. */
@@ -927,12 +1034,12 @@ async function updateAction(win) {
     const active = lastActivity.active;
     const r = await dialog.showMessageBox(win, {
       type: 'question',
-      title: 'Update KDM',
-      message: `Install KDM ${st.version} now?`,
+      title: t('Update KDM'),
+      message: t('Install KDM {v} now?', { v: I18N.ver(st.version) }),
       detail: active
-        ? `KDM will close and reopen. ${active} active download${active > 1 ? 's' : ''} will pause and can be resumed afterwards.`
+        ? t(active > 1 ? 'KDM will close and reopen. {n} active downloads will pause and can be resumed afterwards.' : 'KDM will close and reopen. {n} active download will pause and can be resumed afterwards.', { n: D(active) })
         : 'KDM will close, install the update and open again.',
-      buttons: ['Restart and update', 'Later'],
+      buttons: [t('Restart and update'), t('Later')],
       defaultId: 0,
       cancelId: 1,
       noLink: true,

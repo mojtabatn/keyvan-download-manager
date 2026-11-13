@@ -1,7 +1,7 @@
 'use strict';
 /* Per-download window: progress, pause/resume, connection details. */
 (function () {
-  const { params, el, icon, fmtBytes, fmtSpeed, fmtEta, pct, catIcon } = DM;
+  const { t, params, el, icon, fmtBytes, fmtSpeed, fmtEta, pct, catIcon } = DM;
   const $ = (id) => document.getElementById(id);
   const id = params.get('id');
   // window heights incl. the 32px title bar (Figma: 208 content)
@@ -17,9 +17,9 @@
   });
 
   // Connection / speed-limit selectors in the details panel
-  for (const n of [1, 2, 4, 6, 8, 12, 16, 24, 32]) $('connSel').append(el('option', { value: String(n), text: String(n) }));
-  for (const [v, t] of [[0, 'Unlimited'], [128, '128 KB/s'], [256, '256 KB/s'], [512, '512 KB/s'], [1024, '1 MB/s'], [2048, '2 MB/s'], [5120, '5 MB/s']]) {
-    $('limitSel').append(el('option', { value: String(v), text: t }));
+  for (const n of [1, 2, 4, 6, 8, 12, 16, 24, 32]) $('connSel').append(el('option', { value: String(n), text: DM.n(n) }));
+  for (const [v, label] of [[0, t('Unlimited')], [128, `128 ${t('KB')}/${t('s')}`], [256, `256 ${t('KB')}/${t('s')}`], [512, `512 ${t('KB')}/${t('s')}`], [1024, `1 ${t('MB')}/${t('s')}`], [2048, `2 ${t('MB')}/${t('s')}`], [5120, `5 ${t('MB')}/${t('s')}`]]) {
+    $('limitSel').append(el('option', { value: String(v), text: DM.digits(label) }));
   }
   $('connSel').addEventListener('change', (e) => api.invoke('downloads:action', { id, action: 'connections', value: Number(e.target.value) }));
   $('limitSel').addEventListener('change', (e) => api.invoke('downloads:action', { id, action: 'speedLimit', value: Number(e.target.value) }));
@@ -55,7 +55,7 @@
     drawConnections(det);
     $('connSel').value = String(det.connections);
     $('limitSel').value = String(det.speedLimit || 0);
-    $('resumeInfo').textContent = det.resumable ? 'Resume: Yes' : det.size > 0 ? 'Resume: No' : '';
+    $('resumeInfo').textContent = det.resumable ? t('Resume: Yes') : det.size > 0 ? t('Resume: No') : '';
   }
 
   function cssVar(name) {
@@ -91,20 +91,20 @@
       }
     }
     const active = segs.filter((s) => s.active).length;
-    $('segCount').textContent = det.status === 'completed' ? '' : `${active} active / ${segs.length} parts`;
+    $('segCount').textContent = det.status === 'completed' ? '' : t('{a} active / {n} parts', { a: DM.n(active), n: DM.n(segs.length) });
   }
 
   function drawConnections(det) {
-    const t = $('connTable');
+    const table = $('connTable');
     const rows = [el('div', { class: 'tr th' }, el('span', { text: 'N.' }), el('span', { text: 'Downloaded' }), el('span', { text: 'Info' }))];
     det.conns
       .sort((a, b) => a.start - b.start)
-      .forEach((c, i) => rows.push(el('div', { class: 'tr' }, el('span', { text: String(i) }), el('span', { text: fmtBytes(c.downloaded) }), el('span', { text: c.status }))));
+      .forEach((c, i) => rows.push(el('div', { class: 'tr' }, el('span', { text: DM.n(i) }), el('span', { text: fmtBytes(c.downloaded) }), el('span', { text: c.status }))));
     if (!det.conns.length) {
-      const msg = det.status === 'completed' ? 'Download complete' : det.status === 'downloading' || det.status === 'connecting' ? 'Connecting…' : 'No active connections';
+      const msg = t(det.status === 'completed' ? 'Download complete' : det.status === 'downloading' || det.status === 'connecting' ? 'Connecting…' : 'No active connections');
       rows.push(el('div', { class: 'none', text: msg }));
     }
-    t.replaceChildren(...rows);
+    table.replaceChildren(...rows);
   }
 
   function render() {
@@ -118,9 +118,10 @@
     $('name').textContent = d.filename;
     $('name').title = d.savePath;
 
-    const titleText = done ? 'Download complete' : running ? (d.size > 0 ? `${p}% Downloading` : 'Downloading') : d.status === 'error' ? 'Download error' : d.status === 'queued' ? 'Queued' : d.status === 'canceled' ? 'Canceled' : `${p}% Paused`;
+    const pn = DM.n(p);
+    const titleText = done ? t('Download complete') : running ? (d.size > 0 ? t('{p}% Downloading', { p: pn }) : t('Downloading')) : d.status === 'error' ? t('Download error') : d.status === 'queued' ? t('Queued') : d.status === 'canceled' ? t('Canceled') : t('{p}% Paused', { p: pn });
     $('title').textContent = titleText;
-    document.title = `${d.size > 0 && !done ? p + '% ' : ''}${d.filename}`;
+    document.title = `${d.size > 0 && !done ? pn + '% ' : ''}${d.filename}`;
 
     const bar = $('bar');
     bar.className = `at bar big-bar ${done ? 'completed' : running ? '' : d.status}${running && !(d.size > 0) ? ' indeterminate' : ''}`;
@@ -130,23 +131,23 @@
     speed.className = 'at dl-meta speed';
     if (d.status === 'downloading' && d.stage) speed.textContent = d.stage;
     else if (d.status === 'downloading') speed.textContent = fmtSpeed(d.speed);
-    else if (d.status === 'connecting') speed.textContent = 'Connecting…';
+    else if (d.status === 'connecting') speed.textContent = t('Connecting…');
     else if (d.status === 'error') {
-      speed.textContent = d.error || 'Error';
+      speed.textContent = d.error || t('Error');
       speed.classList.add('err');
       speed.title = d.error || '';
     } else if (done) {
-      speed.textContent = 'Completed';
+      speed.textContent = t('Completed');
       speed.classList.add('ok');
-    } else if (d.status === 'queued') speed.textContent = 'Waiting in queue';
-    else if (d.status === 'canceled') speed.textContent = 'Canceled';
+    } else if (d.status === 'queued') speed.textContent = t('Waiting in queue');
+    else if (d.status === 'canceled') speed.textContent = t('Canceled');
     else speed.textContent = '';
 
     const eta = $('eta');
     eta.hidden = d.status === 'error';
-    if (done) eta.textContent = d.completedAt && d.startedAt && d.completedAt - d.startedAt >= 1000 ? `in ${fmtEta((d.completedAt - d.startedAt) / 1000)}` : '';
+    if (done) eta.textContent = d.completedAt && d.startedAt && d.completedAt - d.startedAt >= 1000 ? t('in {time}', { time: fmtEta((d.completedAt - d.startedAt) / 1000) }) : '';
     else if (d.status === 'downloading') eta.textContent = fmtEta(d.eta);
-    else eta.textContent = d.size > 0 ? `${p}%` : '';
+    else eta.textContent = d.size > 0 ? `${pn}%` : '';
 
     const size = $('size');
     size.replaceChildren();
@@ -162,21 +163,28 @@
     toggle.replaceChildren();
     if (running) {
       toggle.className = 'btn btn-outline blue at';
-      toggle.append(icon('btn-pause'), el('span', { text: 'Pause' }));
+      toggle.append(icon('btn-pause'), el('span', { text: t('Pause') }));
     } else {
       toggle.className = 'btn btn-outline green at';
-      toggle.append(icon('btn-resume', 'only-light'), icon('btn-resume-dark', 'only-dark'), el('span', { text: d.status === 'error' ? 'Retry' : 'Resume' }));
+      toggle.append(icon('btn-resume', 'only-light'), icon('btn-resume-dark', 'only-dark'), el('span', { text: t(d.status === 'error' ? 'Retry' : 'Resume') }));
     }
     // Cancel sits right after the first button, as in the design.
     requestAnimationFrame(() => {
       const first = done ? $('openFile') : toggle;
       const left = 24 + first.offsetWidth + 8;
+      // the button row starts at the leading edge: the left in English, the right in Persian
+      const edge = DM.FA ? 'right' : 'left';
+      const other = DM.FA ? 'left' : 'right';
+      const put = (e, px) => {
+        e.style[other] = '';
+        e.style[edge] = `${px}px`;
+      };
       if (done) {
-        $('openFolder').style.left = `${left}px`;
-        $('cancel').style.left = `${left + $('openFolder').offsetWidth + 8}px`;
-      } else $('cancel').style.left = `${left}px`;
+        put($('openFolder'), left);
+        put($('cancel'), left + $('openFolder').offsetWidth + 8);
+      } else put($('cancel'), left);
     });
-    $('cancel').querySelector('span').textContent = done ? 'Close' : d.status === 'canceled' ? 'Remove' : 'Cancel';
+    $('cancel').querySelector('span').textContent = t(done ? 'Close' : d.status === 'canceled' ? 'Remove' : 'Cancel');
   }
 
   api.on('downloads:progress', (list) => {

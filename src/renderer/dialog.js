@@ -1,7 +1,7 @@
 'use strict';
 /* Add Link → Download File Info / Download Video / several links (batch), plus "Refresh link" mode. */
 (function () {
-  const { params, fmtBytes, catIcon, splitUrls, MEDIA_EXT } = DM;
+  const { t, params, fmtBytes, catIcon, splitUrls, MEDIA_EXT } = DM;
   const $ = (id) => document.getElementById(id);
   const mode = params.get('mode') || 'add';
 
@@ -19,9 +19,10 @@
     source: params.get('source') || 'manual',
   };
 
-  const setTitle = (t) => {
-    $('title').textContent = t;
-    document.title = t;
+  const setTitle = (text) => {
+    text = t(text);
+    $('title').textContent = text;
+    document.title = text;
   };
   const close = () => api.invoke('window:close');
 
@@ -38,7 +39,7 @@
     status.className = `status at ${kind}`;
     status.replaceChildren();
     if (kind === 'busy') status.append(DM.el('span', { class: 'spinner dark' }));
-    if (text) status.append(DM.el('span', { text }));
+    if (text) status.append(DM.el('span', { text: t(text) }));
   }
 
   addr.addEventListener('paste', (e) => {
@@ -62,12 +63,12 @@
     const expanded = expandPatterns(addr.value.trim());
     if (expanded.length > 1) return showBatch(expanded);
     const url = normalizeUrl(addr.value);
-    if (!url) return setStatus('Please enter a valid http(s) link', 'error'), addr.focus();
+    if (!url) return setStatus(t('Please enter a valid http(s) link'), 'error'), addr.focus();
     ctx.url = url;
     // YouTube, X, Instagram… go straight to the video dialog
     if (await api.invoke('media:isVideoPage', url)) return showMedia({ url });
     busy(true);
-    setStatus('Connecting…', 'busy');
+    setStatus(t('Connecting…'), 'busy');
     const info = await api.invoke('downloads:probe', { url, referrer: ctx.referrer, cookies: ctx.cookies, userAgent: ctx.userAgent });
     busy(false);
     if (info.error) return setStatus(info.error, 'error');
@@ -96,14 +97,14 @@
   // ------------------------------------------------------------ refresh mode
   async function submitRefresh() {
     const url = normalizeUrl(addr.value);
-    if (!url) return setStatus('Please enter a valid http(s) link', 'error');
+    if (!url) return setStatus(t('Please enter a valid http(s) link'), 'error');
     busy(true);
-    setStatus('Checking new link…', 'busy');
+    setStatus(t('Checking new link…'), 'busy');
     const [info, detail] = await Promise.all([api.invoke('downloads:probe', { url }), api.invoke('downloads:detail', params.get('id'))]);
     busy(false);
     if (info.error) return setStatus(info.error, 'error');
     if (detail && detail.size > 0 && info.size > 0 && info.size !== detail.size) {
-      return setStatus(`Different file size (${fmtBytes(info.size)} vs ${fmtBytes(detail.size)}) — not the same file`, 'error');
+      return setStatus(t('Different file size ({a} vs {b}) — not the same file', { a: fmtBytes(info.size), b: fmtBytes(detail.size) }), 'error');
     }
     await api.invoke('downloads:action', { id: params.get('id'), action: 'refreshUrl', value: url });
     close();
@@ -124,14 +125,14 @@
     if (!ctx.nameTouched) nameInput.value = base;
     nameInput.title = info.filename;
     $('infoCat').src = catIcon(info.category, 'max');
-    $('infoSize').textContent = pending ? '…' : info.size > 0 ? fmtBytes(info.size) : 'Unknown';
+    $('infoSize').textContent = pending ? '…' : info.size > 0 ? fmtBytes(info.size) : t('Unknown');
     if (!ctx.dirTouched && info.dir) ctx.dir = info.dir;
     $('infoDir').textContent = ctx.dir;
     $('infoFolder').title = ctx.dir;
     $('infoWatch').hidden = !(MEDIA_EXT.test(info.filename) || /^(video|audio)\//.test(info.contentType || ''));
     const warn = $('infoWarn');
     warn.hidden = !(info.isWebPage || info.warning);
-    warn.textContent = info.warning || (info.isWebPage ? 'This link points to a web page, not a file.' : '');
+    warn.textContent = info.warning || (info.isWebPage ? t('This link points to a web page, not a file.') : '');
     if ($('paneInfo').hidden) {
       showPane('paneInfo', 265, 'Download File Info'); // 233 content + 32 title bar
       setTimeout(() => $('infoDownload').focus(), 50);
@@ -208,7 +209,7 @@
   async function defaultDirs() {
     const s = await api.invoke('settings:get');
     return {
-      video: s.categorize ? joinPath(s.downloadDir, 'Video') : s.downloadDir,
+      video: s.categorize ? joinPath(s.downloadDir, 'Video') : s.downloadDir, // folder names stay English on disk
       audio: s.categorize ? joinPath(s.downloadDir, 'Music') : s.downloadDir,
       quality: String(s.videoQuality || 'best'),
     };
@@ -230,7 +231,7 @@
 
   async function probeMedia() {
     mediaState('mediaLoading');
-    $('mediaLoadingText').textContent = 'Looking for the video…';
+    $('mediaLoadingText').textContent = t('Looking for the video…');
     try {
       $('mediaLoadingSub').textContent = new URL(media.url).hostname.replace(/^www\./, '');
     } catch {
@@ -238,7 +239,7 @@
     }
     const r = await api.invoke('media:probe', { url: media.url, candidates: media.candidates, referrer: ctx.referrer, cookies: ctx.cookies, userAgent: ctx.userAgent });
     if (r.needsTools) {
-      $('mediaInstallSize').textContent = String(r.status.downloadSize || 53);
+      $('mediaInstallSub').textContent = t('Downloading videos from YouTube, X and 1000+ sites needs two free helpers (yt-dlp and ffmpeg). It’s a one-time download of about {n} MB.', { n: DM.n(r.status.downloadSize || 53) });
       return mediaState('mediaInstall');
     }
     if (r.error) {
@@ -255,7 +256,7 @@
     const h = Math.floor(s / 3600);
     const m = Math.floor((s % 3600) / 60);
     const sec = String(s % 60).padStart(2, '0');
-    return h ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`;
+    return DM.n(h ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`);
   };
 
   function renderMedia(r) {
@@ -365,7 +366,7 @@
   $('mediaInstallBtn').addEventListener('click', async () => {
     const btn = $('mediaInstallBtn');
     btn.disabled = true;
-    btn.textContent = 'Installing…';
+    btn.textContent = t('Installing…');
     $('mediaInstallProgress').hidden = false;
     const off = api.on('media:install-progress', (p) => {
       const pct = p.total > 0 ? (p.received / p.total) * 100 : 0;
@@ -376,7 +377,7 @@
     off();
     if (r && r.error) {
       btn.disabled = false;
-      btn.textContent = 'Try again';
+      btn.textContent = t('Try again');
       $('mediaInstallText').textContent = r.error;
       return;
     }
@@ -437,14 +438,14 @@
     );
     $('batchAll').checked = true;
     updateBatch();
-    showPane('paneBatch', 420, `Add ${list.length} Downloads`);
+    showPane('paneBatch', 420, t('Add {n} Downloads', { n: DM.n(list.length) }));
     setTimeout(() => $('batchStart').focus(), 50);
   }
 
   function updateBatch() {
     const n = batch.items.filter((i) => i.on).length;
-    $('batchCount').textContent = `${batch.items.length} link${batch.items.length === 1 ? '' : 's'}`;
-    $('batchStatus').textContent = `${n} of ${batch.items.length} selected`;
+    $('batchCount').textContent = batch.items.length === 1 ? t('1 link') : t('{n} links', { n: DM.n(batch.items.length) });
+    $('batchStatus').textContent = t('{n} of {total} selected', { n: DM.n(n), total: DM.n(batch.items.length) });
     $('batchAll').checked = n === batch.items.length;
     $('batchAll').indeterminate = n > 0 && n < batch.items.length;
     $('batchStart').disabled = $('batchQueue').disabled = n === 0;
@@ -479,9 +480,9 @@
     if (mode === 'refresh') {
       setTitle('Refresh Download Link');
       const detail = await api.invoke('downloads:detail', params.get('id'));
-      $('addrLabel').textContent = `New address for “${detail ? detail.filename : 'download'}”:`;
+      $('addrLabel').textContent = t('New address for “{name}”:', { name: detail ? detail.filename : t('download') });
       addr.value = '';
-      addr.placeholder = 'Paste the new link (open the download page again and copy the link)';
+      addr.placeholder = t('Paste the new link (open the download page again and copy the link)');
       setTimeout(() => addr.focus(), 50);
       return;
     }
@@ -496,8 +497,8 @@
       showInfo(fake, { pending: true });
       const info = await api.invoke('downloads:probe', { url: ctx.url, referrer: ctx.referrer, cookies: ctx.cookies, userAgent: ctx.userAgent });
       if (info.error) {
-        showInfo({ ...fake, warning: `Couldn't check the file: ${info.error}` });
-        $('infoSize').textContent = fake.size > 0 ? fmtBytes(fake.size) : 'Unknown';
+        showInfo({ ...fake, warning: t('Couldn’t check the file: {e}', { e: info.error }) });
+        $('infoSize').textContent = fake.size > 0 ? fmtBytes(fake.size) : t('Unknown');
       } else {
         // Prefer the browser's file name (it already applied the site's rules).
         showInfo({ ...info, filename: p.filename || info.filename, probed: true, dir: info.dir });

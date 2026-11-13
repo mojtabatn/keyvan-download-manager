@@ -2,6 +2,7 @@
 
 const path = require('path');
 const { BrowserWindow, screen, shell } = require('electron');
+const { t } = require('../shared/i18n');
 
 const RENDERER = path.join(__dirname, '..', 'renderer');
 const PRELOAD = path.join(__dirname, '..', 'preload', 'preload.js');
@@ -32,12 +33,21 @@ const THEMES = {
 };
 
 class Windows {
-  constructor(getTheme) {
+  constructor(getTheme, getLang = () => 'en') {
     this.getTheme = getTheme; // () => 'light' | 'dark'
+    this.getLang = getLang; // () => 'en' | 'fa'
     this.main = null;
     this.dialogs = new Set();
     this.progress = new Map(); // download id -> window
     this.player = null;
+  }
+
+  /** Reloads every window (after the language changed) so all text is drawn again in the new language. */
+  reloadAll() {
+    for (const w of this.all()) {
+      if (!w.__page || w.__kind === 'player') continue;
+      w.loadFile(path.join(RENDERER, w.__page), { query: { theme: this.getTheme(), lang: this.getLang(), ...w.__query } });
+    }
   }
 
   all() {
@@ -78,7 +88,7 @@ class Windows {
       maximizable: resizable,
       fullscreenable: kind === 'player',
       show: false,
-      title: title || 'Keyvan Download Manager',
+      title: title || t('Keyvan Download Manager'),
       icon: ICON,
       parent,
       backgroundColor: c.bg,
@@ -102,8 +112,10 @@ class Windows {
       },
     });
     win.__kind = kind;
+    win.__page = page;
+    win.__query = query;
     win.setMenuBarVisibility(false);
-    win.loadFile(path.join(RENDERER, page), { query: { theme: this.getTheme(), ...query } });
+    win.loadFile(path.join(RENDERER, page), { query: { theme: this.getTheme(), lang: this.getLang(), ...query } });
     if (show) win.once('ready-to-show', () => this.reveal(win));
     // Never let a dropped link or stray anchor navigate the app away.
     win.webContents.on('will-navigate', (e, url) => {
@@ -138,7 +150,7 @@ class Windows {
       minHeight: 440,
       resizable: true,
       show,
-      title: 'Keyvan Download Manager',
+      title: t('Keyvan Download Manager'),
     });
     this.main.on('closed', () => (this.main = null));
     return this.main;
@@ -151,12 +163,23 @@ class Windows {
       width: 580,
       height: sizes[query.mode] || 186,
       query: { ...query, payload: query.payload ? JSON.stringify(query.payload) : '' },
-      title: query.mode === 'info' ? 'Download File Info' : query.mode === 'media' ? 'Download Video' : 'Add New Download',
+      title: t(query.mode === 'info' ? 'Download File Info' : query.mode === 'media' ? 'Download Video' : 'Add New Download'),
     });
     this.dialogs.add(win);
     win.on('closed', () => this.dialogs.delete(win));
     this.cascade(win);
     return win;
+  }
+
+  /** "What's new" after an update. query: { from?: last seen version, to: current version } */
+  openWhatsNew(query) {
+    if (this.whatsNew && !this.whatsNew.isDestroyed()) {
+      this.reveal(this.whatsNew);
+      return this.whatsNew;
+    }
+    this.whatsNew = this.create('dialog', 'whatsnew.html', { width: 520, height: 600, resizable: false, query, title: t('What’s new') });
+    this.whatsNew.on('closed', () => (this.whatsNew = null));
+    return this.whatsNew;
   }
 
   openProgress(id) {
@@ -165,7 +188,7 @@ class Windows {
       this.reveal(existing);
       return existing;
     }
-    const win = this.create('dialog', 'progress.html', { width: 580, height: 240, query: { id }, title: 'Downloading' });
+    const win = this.create('dialog', 'progress.html', { width: 580, height: 240, query: { id }, title: t('Downloading') });
     this.progress.set(id, win);
     win.on('closed', () => this.progress.delete(id));
     this.cascade(win);
@@ -187,7 +210,7 @@ class Windows {
       resizable: true,
       query: { src: query.src, title: query.title },
       partition: query.partition,
-      title: query.title || 'Online Watch',
+      title: query.title || t('Online Watch'),
     });
     this.player.on('closed', () => (this.player = null));
     return this.player;

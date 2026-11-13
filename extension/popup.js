@@ -2,6 +2,9 @@ const DEFAULTS = { enabled: true, minSizeKB: 512 };
 const $ = (id) => document.getElementById(id);
 
 (async () => {
+  await KDM_I18N.init();
+  KDM_I18N.translateDom(document.body);
+  const T = KDM_I18N.t;
   const cfg = { ...DEFAULTS, ...(await chrome.storage.local.get(DEFAULTS)) };
   $('enabled').checked = cfg.enabled;
   $('minSize').value = String(cfg.minSizeKB);
@@ -12,15 +15,15 @@ const $ = (id) => document.getElementById(id);
   const el = $('status');
   if (st && st.app) {
     el.className = 'status ok';
-    $('statusText').textContent = st.enabled ? `Connected · v${st.version}` : 'Connected · integration is off in the app';
+    $('statusText').textContent = st.enabled ? T('Connected · v{v}', { v: KDM_I18N.digits(st.version) }) : T('Connected · integration is off in the app');
   } else {
     el.className = 'status bad';
-    $('statusText').textContent = 'App not running — downloads stay in the browser';
+    $('statusText').textContent = T('App not running — downloads stay in the browser');
   }
   // ---- videos found on this tab
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   const found = tab ? (await chrome.runtime.sendMessage({ type: 'tab-media', tabId: tab.id })) || [] : [];
-  $('vCount').textContent = String(found.length);
+  $('vCount').textContent = KDM_I18N.digits(found.length);
   const mb = (n) => (n > 0 ? (n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.round(n / 1024)} KB`) : '');
   const name = (u) => {
     try {
@@ -42,14 +45,14 @@ const $ = (id) => document.getElementById(id);
     $('vList').append(row);
   }
   $('grabVideo').addEventListener('click', async () => {
-    $('grabVideo').textContent = 'Sending…';
+    $('grabVideo').textContent = T('Sending…');
     const ok = tab && (await chrome.runtime.sendMessage({ type: 'grab-tab', tabId: tab.id }));
     if (ok) window.close();
-    else $('grabVideo').textContent = 'KDM isn’t running';
+    else $('grabVideo').textContent = T('KDM isn’t running');
   });
 
   $('grab').addEventListener('click', async () => {
-    $('grab').textContent = 'Sending…';
+    $('grab').textContent = T('Sending…');
     await chrome.runtime.sendMessage({ type: 'grab' });
     window.close();
   });

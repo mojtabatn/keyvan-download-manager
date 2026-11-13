@@ -1,11 +1,14 @@
 'use strict';
 
+const { t, digits: D } = require('../../shared/i18n');
+
 const fs = require('fs');
 const fsp = fs.promises;
 const path = require('path');
 const { spawn } = require('child_process');
 const { EventEmitter } = require('events');
 const { sanitize, uniquePath } = require('../engine/filename');
+const proxyConfig = require('../engine/proxy');
 
 // yt-dlp is a Python program: force UTF-8 so non-English titles survive on Windows.
 // ELECTRON_RUN_AS_NODE lets yt-dlp use KDM's own executable as its JavaScript runtime (see jsArgs).
@@ -49,9 +52,10 @@ function killTree(proc) {
 }
 
 /** Runs `yt-dlp -J` and returns the parsed info JSON. */
-function probeInfo(ytdlp, url, headers = {}, timeout = 90000) {
+async function probeInfo(ytdlp, url, headers = {}, timeout = 90000) {
+  const proxyArgs = await proxyConfig.ytdlpArgs(url).catch(() => []); // same proxy as downloads
   return new Promise((resolve, reject) => {
-    const args = ['-J', '--no-playlist', '--no-warnings', '--no-colors', ...jsArgs(), ...headerArgs(headers), '--', url];
+    const args = ['-J', '--no-playlist', '--no-warnings', '--no-colors', ...jsArgs(), ...proxyArgs, ...headerArgs(headers), '--', url];
     const p = spawn(ytdlp, args, { windowsHide: true, env: childEnv() });
     let out = '';
     let err = '';
@@ -97,7 +101,7 @@ function cleanError(text) {
 const SITE_NAMES = { Youtube: 'YouTube', YoutubeTab: 'YouTube', Twitter: 'X', TwitterBroadcast: 'X', Instagram: 'Instagram', TikTok: 'TikTok', Vimeo: 'Vimeo', Facebook: 'Facebook', Aparat: 'Aparat', SoundCloud: 'SoundCloud', Twitch: 'Twitch' };
 const sizeOf = (f, dur) => (f && (f.filesize || f.filesize_approx || (f.tbr && dur ? f.tbr * 125 * dur : 0))) || 0;
 const codecName = (c = '') => (/^avc1|h264/i.test(c) ? 'H.264' : /^vp0?9/i.test(c) ? 'VP9' : /^av01/i.test(c) ? 'AV1' : /^hev|hvc|h265/i.test(c) ? 'HEVC' : '');
-const nick = (h) => (h >= 2160 ? '4K' : h >= 1440 ? '2K' : h >= 1080 ? 'Full HD' : h >= 720 ? 'HD' : '');
+const nick = (h) => (h >= 2160 ? '4K' : h >= 1440 ? '2K' : h >= 1080 ? t('Full HD') : h >= 720 ? t('HD') : '');
 
 /** Turns yt-dlp's long format list into a few clear choices. */
 function buildOptions(info) {
@@ -127,10 +131,10 @@ function buildOptions(info) {
     });
   }
   if (auds.length || formats.some(hasA)) {
-    options.push({ id: 'audio', height: 0, label: 'Audio only', detail: 'MP3', size: sizeOf(bestAudio, dur), format: 'ba/b', audioOnly: true, ext: 'mp3' });
+    options.push({ id: 'audio', height: 0, label: t('Audio only'), detail: 'MP3', size: sizeOf(bestAudio, dur), format: 'ba/b', audioOnly: true, ext: 'mp3' });
   }
   if (!options.length) {
-    options.push({ id: 'best', height: 0, label: 'Best quality', detail: String(info.ext || 'mp4').toUpperCase(), size: sizeOf(info, dur), format: 'bv*+ba/b', audioOnly: false, ext: info.ext || 'mp4' });
+    options.push({ id: 'best', height: 0, label: t('Best quality'), detail: String(info.ext || 'mp4').toUpperCase(), size: sizeOf(info, dur), format: 'bv*+ba/b', audioOnly: false, ext: info.ext || 'mp4' });
   }
   return options;
 }
@@ -197,6 +201,7 @@ class MediaDownload extends EventEmitter {
       createdAt: d.createdAt,
       completedAt: d.completedAt || null,
       startedAt: d.startedAt || null,
+      lastTryAt: d.lastTryAt || d.completedAt || d.startedAt || null,
       activeConnections: this.running ? 1 : 0,
       connections: d.connections,
       speedLimit: d.speedLimit || 0,
@@ -244,6 +249,7 @@ class MediaDownload extends EventEmitter {
     this.d.error = null;
     this.stage = 'Connecting…';
     this.d.startedAt = this.d.startedAt || Date.now();
+    this.d.lastTryAt = Date.now();
     this.setStatus('connecting');
     this.runPromise = this.run().finally(() => {
       this.running = false;
@@ -259,7 +265,7 @@ class MediaDownload extends EventEmitter {
     try {
       await fsp.mkdir(this.d.dir, { recursive: true });
     } catch (e) {
-      this.d.error = e.code === 'EACCES' || e.code === 'EPERM' ? 'No permission to write to the folder' : e.message;
+      this.d.error = e.code === 'EACCES' || e.code === 'EPERM' ? t('No permission to write to the folder') : e.message;
       this.setStatus('error');
       this.emit('failed', this);
       return;
@@ -268,10 +274,17 @@ class MediaDownload extends EventEmitter {
   }
 
   spawnYtdlp() {
+    return proxyConfig
+      .ytdlpArgs(this.d.url)
+      .catch(() => [])
+      .then((proxyArgs) => this.spawnYtdlpWith(proxyArgs));
+  }
+
+  spawnYtdlpWith(proxyArgs) {
     return new Promise((resolve) => {
       const tools = this.ctx.tools;
       if (!tools.ready()) {
-        this.d.error = 'Video support is not installed (Settings → Video downloads)';
+        this.d.error = t('Video support is not installed (Settings → Video downloads)');
         this.setStatus('error');
         this.emit('failed', this);
         return resolve();
@@ -282,6 +295,7 @@ class MediaDownload extends EventEmitter {
         '-f', this.d.format || 'bv*+ba/b',
         '--no-playlist',
         ...jsArgs(),
+        ...proxyArgs,
         '--newline',
         '--no-colors',
         '--quiet',
@@ -345,7 +359,7 @@ class MediaDownload extends EventEmitter {
           this.setStatus('completed');
           this.emit('completed', this);
         } else {
-          this.d.error = cleanError(errText) || 'Video download failed';
+          this.d.error = t(cleanError(errText) || 'Video download failed');
           this.setStatus('error');
           this.emit('failed', this);
         }
@@ -374,7 +388,7 @@ class MediaDownload extends EventEmitter {
     this.speed = num(speed) || 0;
     this.eta = num(eta) >= 0 ? num(eta) : -1;
     if (status === 'finished' && this.phase + 1 >= this.phases) {
-      this.stage = this.d.audioOnly ? 'Converting to MP3…' : this.phases > 1 ? 'Merging video and audio…' : 'Finishing…';
+      this.stage = t(this.d.audioOnly ? 'Converting to MP3…' : this.phases > 1 ? 'Merging video and audio…' : 'Finishing…');
       this.speed = 0;
     } else this.stage = '';
     if (this.d.status !== 'downloading') this.setStatus('downloading');

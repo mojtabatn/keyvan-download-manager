@@ -2,11 +2,11 @@
 const IS_MAC = document.documentElement.dataset.platform === 'mac';
 /* Main window controller. */
 (function () {
-  const { el, icon, fmtBytes, fmtSpeed, fmtEta, fmtSizePair, pct, catIcon, toast, splitUrls } = DM;
+  const { t, el, icon, fmtBytes, fmtSpeed, fmtEta, fmtSizePair, pct, catIcon, toast, splitUrls } = DM;
   if (IS_MAC) {
     // macOS wording: ⌘ shortcuts, and there is no hibernate
-    document.getElementById('addLink').title = 'Add a new download (⌘N)';
-    document.getElementById('emptySub').textContent = 'Click “Add Link”, paste a link (⌘V) or drop one here.';
+    document.getElementById('addLink').title = t('Add a new download ({key})', { key: '⌘N' });
+    document.getElementById('emptySub').textContent = t('Click “Add Link”, paste a link ({key}) or drop one here.', { key: '⌘V' });
     document.querySelector('option[value="hibernate"]')?.remove();
   }
   const $ = (id) => document.getElementById(id);
@@ -35,7 +35,7 @@ const IS_MAC = document.documentElement.dataset.platform === 'mac';
       api.invoke('queue:state'),
       api.invoke('power:state'),
     ]);
-    $('version').textContent = `Version ${String(info.version).replace(/\.0$/, '')}`;
+    $('version').textContent = t('Version {v}', { v: DM.v(String(info.version).replace(/\.0$/, '')) });
     DM.appInfo = info;
     state.settings = settings;
     state.listView = settings.listView || 'cards';
@@ -47,6 +47,13 @@ const IS_MAC = document.documentElement.dataset.platform === 'mac';
     renderQueuePanel();
     if (pending) showPower(pending);
     SettingsView.mount($('view-settings'), settings, info);
+    // after a language change the window reloads: come back to the screen the user was on
+    try {
+      const v = sessionStorage.getItem('kdm.view');
+      if (v && v !== state.view && document.querySelector(`.nav-item[data-view="${v}"]`)) setView(v);
+    } catch {
+      /* no session storage */
+    }
   }
 
   api.on('downloads:added', (d) => {
@@ -97,11 +104,11 @@ const IS_MAC = document.documentElement.dataset.platform === 'mac';
 
   let speedTimer;
   function setTotalSpeed(speed, n) {
-    const t = $('totalSpeed');
-    t.hidden = !n;
-    t.textContent = `↓ ${fmtSpeed(speed).replace('/sec', '/s')}`;
+    const box = $('totalSpeed');
+    box.hidden = !n;
+    box.textContent = `↓ ${fmtSpeed(speed).replace(`/${t('sec')}`, `/${t('s')}`).replace('/sec', '/s')}`;
     clearTimeout(speedTimer);
-    speedTimer = setTimeout(() => (t.hidden = true), 1500);
+    speedTimer = setTimeout(() => (box.hidden = true), 1500);
   }
 
   // ------------------------------------------------------------ list rendering
@@ -119,9 +126,9 @@ const IS_MAC = document.documentElement.dataset.platform === 'mac';
   function renderAll() {
     const all = [...state.items.values()];
     const active = all.filter((d) => ['downloading', 'connecting'].includes(d.status)).length;
-    $('badgeAll').textContent = active ? String(active) : '';
+    $('badgeAll').textContent = active ? DM.n(active) : '';
     const waiting = all.filter((d) => d.queued && d.status !== 'completed').length;
-    $('badgeQueue').textContent = waiting ? String(waiting) : '';
+    $('badgeQueue').textContent = waiting ? DM.n(waiting) : '';
 
     if (state.view === 'settings') return updateActions();
     const listEl = state.view === 'scheduled' ? $('qlist') : $('list');
@@ -168,14 +175,14 @@ const IS_MAC = document.documentElement.dataset.platform === 'mac';
       empty.hidden = items.length > 0;
       if (!items.length) {
         if (state.query) {
-          $('emptyTitle').textContent = 'Nothing found';
-          $('emptySub').textContent = `No downloads match “${state.query}”.`;
+          $('emptyTitle').textContent = t('Nothing found');
+          $('emptySub').textContent = t('No downloads match “{q}”.', { q: state.query });
         } else if (state.view === 'completed') {
-          $('emptyTitle').textContent = 'No completed downloads';
-          $('emptySub').textContent = 'Finished files will show up here.';
+          $('emptyTitle').textContent = t('No completed downloads');
+          $('emptySub').textContent = t('Finished files will show up here.');
         } else {
-          $('emptyTitle').textContent = 'No downloads yet';
-          $('emptySub').textContent = `Click “Add Link”, paste a link (${IS_MAC ? '⌘V' : 'Ctrl+V'}) or drop one here.`;
+          $('emptyTitle').textContent = t('No downloads yet');
+          $('emptySub').textContent = t('Click “Add Link”, paste a link ({key}) or drop one here.', { key: IS_MAC ? '⌘V' : 'Ctrl+V' });
         }
       }
     }
@@ -199,7 +206,8 @@ const IS_MAC = document.documentElement.dataset.platform === 'mac';
     const doneMeta = el('div', { class: 'done-meta' });
     const cSize = el('div', { class: 'c-size' });
     const cStat = el('div', { class: 'c-stat' });
-    const row = el('div', { class: 'row', tabindex: '-1' }, cat, name, acts, bar, meta, doneMeta, cSize, cStat);
+    const cTry = el('div', { class: 'c-try' });
+    const row = el('div', { class: 'row', tabindex: '-1' }, cat, name, acts, bar, meta, doneMeta, cSize, cStat, cTry);
     const divider = el('div', { class: 'divider' });
     const id = d.id;
     toggle.addEventListener('click', (e) => {
@@ -224,7 +232,7 @@ const IS_MAC = document.documentElement.dataset.platform === 'mac';
       if (!state.sel.has(id)) select(id);
       api.invoke('downloads:contextMenu', id);
     });
-    return { row, divider, parts: { cat, nameText, name, toggle, toggleImg, x, bar, fill, speed, eta, size, doneMeta, cSize, cStat }, key: '' };
+    return { row, divider, parts: { cat, nameText, name, toggle, toggleImg, x, bar, fill, speed, eta, size, doneMeta, cSize, cStat, cTry }, key: '' };
   }
 
   function fillRow(r, d) {
@@ -238,18 +246,21 @@ const IS_MAC = document.documentElement.dataset.platform === 'mac';
     p.name.title = d.filename;
     // compact-list cells
     p.cSize.textContent = d.size > 0 ? fmtBytes(d.size) : d.downloaded > 0 ? fmtBytes(d.downloaded) : '—';
+    p.cTry.textContent = d.lastTryAt ? DM.dateTime(d.lastTryAt) : '—';
+    p.cTry.title = d.lastTryAt ? `${t('Last try')}: ${DM.dateTime(d.lastTryAt, { second: '2-digit' })}` : '';
     p.cStat.textContent = compactStatus(d);
     p.cStat.className = `c-stat ${d.status}`;
     p.cStat.title = d.status === 'error' ? d.error || '' : '';
     if (done) {
-      p.doneMeta.textContent = `${fmtBytes(d.size)}${d.completedAt ? ' · ' + new Date(d.completedAt).toLocaleDateString() : ''}`;
+      const when = d.lastTryAt || d.completedAt;
+      p.doneMeta.textContent = `${fmtBytes(d.size)}${when ? ' · ' + DM.dateTime(when) : ''}`;
       return;
     }
     const running = d.status === 'downloading' || d.status === 'connecting';
     const toggleSrc = running ? 'assets/icons/row-pause.svg' : 'assets/icons/row-play.svg';
     if (p.toggleImg.getAttribute('src') !== toggleSrc) p.toggleImg.src = toggleSrc;
-    p.toggle.title = running ? 'Pause' : d.status === 'error' ? 'Retry' : 'Resume';
-    p.x.title = d.status === 'canceled' ? 'Remove from list' : 'Cancel';
+    p.toggle.title = t(running ? 'Pause' : d.status === 'error' ? 'Retry' : 'Resume');
+    p.x.title = t(d.status === 'canceled' ? 'Remove from list' : 'Cancel');
     p.bar.className = `bar ${running ? '' : d.status}${running && !(d.size > 0) ? ' indeterminate' : ''}`;
     p.fill.style.width = `${pct(d)}%`;
     let left = '';
@@ -260,16 +271,16 @@ const IS_MAC = document.documentElement.dataset.platform === 'mac';
     } else if (d.status === 'downloading') {
       left = fmtSpeed(d.speed);
       mid = fmtEta(d.eta);
-    } else if (d.status === 'connecting') left = 'Connecting…';
+    } else if (d.status === 'connecting') left = t('Connecting…');
     else if (d.status === 'queued') {
-      left = 'Queued';
-      mid = d.size > 0 ? `${Math.floor(pct(d))}%` : '';
-    } else if (d.status === 'paused') mid = d.size > 0 ? `${Math.floor(pct(d))}%` : 'Paused';
+      left = t('Queued');
+      mid = d.size > 0 ? DM.n(`${Math.floor(pct(d))}%`) : '';
+    } else if (d.status === 'paused') mid = d.size > 0 ? DM.n(`${Math.floor(pct(d))}%`) : t('Paused');
     else if (d.status === 'canceled') {
-      left = 'Canceled';
-      mid = d.size > 0 && d.downloaded > 0 ? `${Math.floor(pct(d))}%` : '';
+      left = t('Canceled');
+      mid = d.size > 0 && d.downloaded > 0 ? DM.n(`${Math.floor(pct(d))}%`) : '';
     }
-    else if (d.status === 'error') left = d.error || 'Error';
+    else if (d.status === 'error') left = d.error || t('Error');
     p.speed.textContent = left;
     p.speed.title = d.status === 'error' ? left : '';
     p.eta.textContent = mid;
@@ -277,15 +288,15 @@ const IS_MAC = document.documentElement.dataset.platform === 'mac';
   }
 
   function compactStatus(d) {
-    const p = d.size > 0 ? `${Math.floor(pct(d))}%` : '';
+    const p = d.size > 0 ? DM.n(`${Math.floor(pct(d))}%`) : '';
     switch (d.status) {
-      case 'completed': return 'Completed';
+      case 'completed': return t('Completed');
       case 'downloading': return d.stage || [p, fmtSpeed(d.speed)].filter(Boolean).join(' · ');
-      case 'connecting': return 'Connecting…';
-      case 'paused': return ['Paused', p].filter(Boolean).join(' · ');
-      case 'queued': return 'Queued';
-      case 'canceled': return 'Canceled';
-      case 'error': return 'Error';
+      case 'connecting': return t('Connecting…');
+      case 'paused': return [t('Paused'), p].filter(Boolean).join(' · ');
+      case 'queued': return t('Queued');
+      case 'canceled': return t('Canceled');
+      case 'error': return t('Error');
       default: return '';
     }
   }
@@ -342,18 +353,18 @@ const IS_MAC = document.documentElement.dataset.platform === 'mac';
     const many = sel.length > 1;
     const resume = $('actResume');
     resume.disabled = !sel.some(canResume);
-    resume.dataset.tip = !many && sel[0] && sel[0].status === 'error' ? 'Retry' : many ? `Resume ${sel.filter(canResume).length}` : 'Resume';
+    resume.dataset.tip = !many && sel[0] && sel[0].status === 'error' ? t('Retry') : many ? t('Resume {n}', { n: DM.n(sel.filter(canResume).length) }) : t('Resume');
     $('actPause').disabled = !sel.some(canPause);
-    $('actPause').dataset.tip = many ? `Pause ${sel.filter(canPause).length}` : 'Pause';
+    $('actPause').dataset.tip = many ? t('Pause {n}', { n: DM.n(sel.filter(canPause).length) }) : t('Pause');
     $('actStop').disabled = ![...state.items.values()].some((x) => isRunning(x) || (x.status === 'queued' && state.queueRunning));
     $('actDelete').disabled = !sel.length;
-    $('actDelete').dataset.tip = many ? `Delete ${sel.length} downloads` : 'Delete';
+    $('actDelete').dataset.tip = many ? t('Delete {n} downloads', { n: DM.n(sel.length) }) : t('Delete');
     const shown = state.view === 'settings' ? 0 : visibleItems().length;
     const all = shown > 0 && sel.length === shown;
     const sa = $('actSelectAll');
     sa.disabled = !shown;
     sa.classList.toggle('on', all);
-    sa.dataset.tip = all ? 'Deselect all' : 'Select all';
+    sa.dataset.tip = t(all ? 'Deselect all' : 'Select all');
   }
   $('actResume').addEventListener('click', () => {
     for (const d of selectedItems().filter(canResume)) api.invoke('downloads:action', { id: d.id, action: 'start' });
@@ -389,7 +400,7 @@ const IS_MAC = document.documentElement.dataset.platform === 'mac';
   // ------------------------------------------------------------ footer
   $('github').addEventListener('click', async () => {
     const ok = await api.invoke('shell:openProject');
-    if (!ok) toast('Project link will be added soon');
+    if (!ok) toast(t('Project link will be added soon'));
   });
 
   // ------------------------------------------------------------ update button (GitHub Releases)
@@ -401,22 +412,23 @@ const IS_MAC = document.documentElement.dataset.platform === 'mac';
     if (!show) return;
     btn.classList.toggle('busy', st.status === 'downloading');
     btn.classList.toggle('ready', st.status === 'ready');
-    let label = 'Update Available!';
-    let tip = `KDM ${st.version} is available. Click to download it.`;
-    if (st.status === 'available' && (st.portable || !st.asset)) tip = `KDM ${st.version} is available. Click to open the download page.`;
+    const v = DM.v(st.version);
+    let label = t('Update Available!');
+    let tip = t('KDM {v} is available. Click to download it.', { v });
+    if (st.status === 'available' && (st.portable || !st.asset)) tip = t('KDM {v} is available. Click to open the download page.', { v });
     if (st.status === 'downloading') {
       const p = st.progress && st.progress.total ? Math.min(100, Math.floor((st.progress.received / st.progress.total) * 100)) : 0;
-      label = `Downloading… ${p}%`;
-      tip = `Downloading KDM ${st.version}`;
+      label = t('Downloading… {p}%', { p: DM.n(p) });
+      tip = t('Downloading KDM {v}', { v });
       $('updateFill').style.width = p + '%';
     }
     if (st.status === 'ready') {
-      label = 'Restart to Update';
-      tip = `KDM ${st.version} is ready. Click to install it and restart.`;
+      label = t('Restart to Update');
+      tip = t('KDM {v} is ready. Click to install it and restart.', { v });
     }
     if (st.status === 'error') {
-      label = 'Update failed · Retry';
-      tip = st.error || 'The update could not be downloaded.';
+      label = t('Update failed · Retry');
+      tip = st.error || t('The update could not be downloaded.');
     }
     $('updateLabel').textContent = label;
     btn.title = tip;
@@ -437,6 +449,11 @@ const IS_MAC = document.documentElement.dataset.platform === 'mac';
 
   function setView(v) {
     state.view = v;
+    try {
+      sessionStorage.setItem('kdm.view', v);
+    } catch {
+      /* no session storage */
+    }
     for (const b of document.querySelectorAll('.nav-item')) b.classList.toggle('active', b.dataset.view === v);
     $('view-list').hidden = !(v === 'all' || v === 'completed');
     $('view-scheduled').hidden = v !== 'scheduled';
@@ -504,10 +521,12 @@ const IS_MAC = document.documentElement.dataset.platform === 'mac';
   });
 
   // ------------------------------------------------------------ scheduled / queue panel
-  const DAY = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+  const DAY = ['S', 'M', 'T', 'W', 'T', 'F', 'S']; // Sunday first; Persian shows the week from Saturday
   const DAY_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const DAY_ORDER = DM.FA ? [6, 0, 1, 2, 3, 4, 5] : [0, 1, 2, 3, 4, 5, 6];
+  const dayLetter = (i) => (DM.FA ? t(DAY_FULL[i]).charAt(0) : DAY[i]);
   const maxSel = $('schMax');
-  for (let i = 1; i <= 10; i++) maxSel.append(el('option', { value: String(i), text: String(i) }));
+  for (let i = 1; i <= 10; i++) maxSel.append(el('option', { value: String(i), text: DM.n(i) }));
 
   const queues = () => (state.settings && state.settings.queues) || [];
   const currentQueue = () => queues().find((q) => q.id === state.queue) || queues()[0];
@@ -542,7 +561,7 @@ const IS_MAC = document.documentElement.dataset.platform === 'mac';
       } else {
         if (state.queueStates[q.id]) tab.append(el('i', { class: 'q-dot', title: 'Running' }));
         tab.append(el('span', { class: 'q-name', text: q.name }));
-        tab.append(el('span', { class: 'q-count', text: n ? String(n) : '' }));
+        tab.append(el('span', { class: 'q-count', text: n ? DM.n(n) : '' }));
         tab.addEventListener('click', () => {
           if (state.queue === q.id) return;
           state.queue = q.id;
@@ -556,7 +575,7 @@ const IS_MAC = document.documentElement.dataset.platform === 'mac';
     });
     const add = el('button', { class: 'q-add', title: 'Create another queue with its own schedule', onclick: () => newQueue() });
     add.innerHTML = '<svg viewBox="0 0 12 12" fill="none"><path d="M6 1.5v9M1.5 6h9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
-    add.append(document.createTextNode('New queue'));
+    add.append(document.createTextNode(t('New queue')));
     $('queueTabs').replaceChildren(...tabs, add);
   }
 
@@ -568,9 +587,9 @@ const IS_MAC = document.documentElement.dataset.platform === 'mac';
   function newQueue() {
     const list = queues();
     let n = list.length + 1;
-    while (list.some((q) => q.name === `Queue ${n}`)) n++;
+    while (list.some((q) => q.name === t('Queue {n}', { n: DM.n(n) }))) n++;
     const id = `q${Date.now().toString(36)}`;
-    const q = { id, name: `Queue ${n}`, maxConcurrent: 1 /* one download at a time */, schedule: { enabled: false, startTime: '02:00', stopEnabled: false, stopTime: '08:00', days: [0, 1, 2, 3, 4, 5, 6], afterDone: 'none' } };
+    const q = { id, name: t('Queue {n}', { n: DM.n(n) }), maxConcurrent: 1 /* one download at a time */, schedule: { enabled: false, startTime: '02:00', stopEnabled: false, stopTime: '08:00', days: [0, 1, 2, 3, 4, 5, 6], afterDone: 'none' } };
     state.queue = id;
     editing = id;
     select(null);
@@ -593,8 +612,8 @@ const IS_MAC = document.documentElement.dataset.platform === 'mac';
     const running = !!state.queueStates[q.id];
     $('queueStart').hidden = running;
     $('queueStop').hidden = !running;
-    $('queueStart').querySelector('span').textContent = queues().length > 1 ? `Start “${q.name}”` : 'Start queue';
-    $('queueStop').querySelector('span').textContent = queues().length > 1 ? `Stop “${q.name}”` : 'Stop queue';
+    $('queueStart').querySelector('span').textContent = queues().length > 1 ? t('Start “{name}”', { name: t(q.name) }) : t('Start queue');
+    $('queueStop').querySelector('span').textContent = queues().length > 1 ? t('Stop “{name}”', { name: t(q.name) }) : t('Stop queue');
     $('queueDelete').hidden = q.id === 'main';
     $('schEnabled').checked = sch.enabled;
     $('schStart').value = sch.startTime;
@@ -604,11 +623,11 @@ const IS_MAC = document.documentElement.dataset.platform === 'mac';
     $('schAfter').value = sch.afterDone;
     const days = $('schDays');
     days.replaceChildren(
-      ...DAY.map((d, i) =>
+      ...DAY_ORDER.map((i) =>
         el('button', {
           class: `day${sch.days.includes(i) ? ' on' : ''}`,
-          text: d,
-          title: DAY_FULL[i],
+          text: dayLetter(i),
+          title: t(DAY_FULL[i]),
           onclick: () => {
             const set = new Set(currentQueue().schedule.days);
             set.has(i) ? set.delete(i) : set.add(i);
@@ -628,15 +647,15 @@ const IS_MAC = document.documentElement.dataset.platform === 'mac';
     const running = !!state.queueStates[cur.id];
     const sch = cur.schedule;
     let text;
-    if (running) text = `Running · ${active} active, ${q.length - active} waiting`;
-    else if (!q.length) text = 'Queue is empty';
-    else text = `${q.length} waiting`;
-    if (!running && sch.enabled) text += ` · starts at ${sch.startTime}`;
+    if (running) text = t('Running · {a} active, {w} waiting', { a: DM.n(active), w: DM.n(q.length - active) });
+    else if (!q.length) text = t('Queue is empty');
+    else text = t('{n} waiting', { n: DM.n(q.length) });
+    if (!running && sch.enabled) text += ` · ${t('starts at {time}', { time: DM.n(sch.startTime) })}`;
     $('queueStatus').textContent = text;
     // counts on the tabs follow the list
     for (const tab of $('queueTabs').querySelectorAll('.q-tab')) {
       const c = tab.querySelector('.q-count');
-      if (c) c.textContent = String(queueCount(tab.dataset.id) || '');
+      if (c) c.textContent = queueCount(tab.dataset.id) ? DM.n(queueCount(tab.dataset.id)) : '';
     }
   }
 
@@ -663,7 +682,7 @@ const IS_MAC = document.documentElement.dataset.platform === 'mac';
     const b = $('powerBanner');
     if (!p) return (b.hidden = true);
     b.hidden = false;
-    $('powerText').textContent = p.seconds != null ? `Queue finished — ${p.label} in ${p.seconds}s` : `Queue finished — ${p.action} pending`;
+    $('powerText').textContent = p.seconds != null ? t('Queue finished — {label} in {s}s', { label: t(p.label), s: DM.n(p.seconds) }) : t('Queue finished — {action} pending', { action: p.action });
   }
   $('powerCancel').addEventListener('click', () => api.invoke('power:cancel'));
 

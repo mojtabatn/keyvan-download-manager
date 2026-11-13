@@ -27,6 +27,12 @@
     </button>`;
   const btn = root.querySelector('button');
   const label = root.querySelector('span');
+  const T = KDM_I18N.t;
+  // the language comes from the app (see i18n.js)
+  KDM_I18N.init().then(() => {
+    label.textContent = T('Download video');
+    btn.title = T('Download this video with KDM');
+  });
   (document.body || document.documentElement).appendChild(host);
 
   let current = null;
@@ -84,10 +90,10 @@
     e.preventDefault();
     e.stopPropagation();
     const src = current ? current.currentSrc || current.src : '';
-    label.textContent = 'Sending…';
+    label.textContent = T('Sending…');
     chrome.runtime.sendMessage({ type: 'grab-video', src, title: document.title }, (ok) => {
-      label.textContent = chrome.runtime.lastError || !ok ? 'KDM isn’t running' : 'Sent to KDM ✓';
-      setTimeout(() => (label.textContent = 'Download video'), 2200);
+      label.textContent = chrome.runtime.lastError || !ok ? T('KDM isn’t running') : T('Sent to KDM ✓');
+      setTimeout(() => (label.textContent = T('Download video')), 2200);
     });
   });
 })();

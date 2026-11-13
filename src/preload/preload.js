@@ -6,6 +6,8 @@ const INVOKE = new Set([
   'app:info',
   'settings:get',
   'settings:set',
+  'proxy:test',
+  'whatsnew:open',
   'downloads:list',
   'downloads:detail',
   'downloads:probe',

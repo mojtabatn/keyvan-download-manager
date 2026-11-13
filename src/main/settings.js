@@ -14,6 +14,10 @@ function defaults(downloadsDir) {
     maxConcurrent: 1, // downloads at a time from a queue: one after another
     speedLimit: 0, // KB/s, 0 = unlimited
     maxRetries: 10,
+    // How KDM reaches the internet. 'system' follows the operating system's proxy.
+    proxy: { mode: 'none', type: 'http', host: '', port: 0, username: '', password: '', passwordEnc: '' },
+    lastSeenVersion: null, // the version whose "What's new" was shown last
+    language: null, // 'en' | 'fa'; null = pick from the system language on first start
     listView: 'cards', // 'cards' (large icons) | 'compact' (list without icons)
     videoQuality: 'best', // preselected quality: 'best' | '2160' | '1080' | '720' | '480' | '360' | 'audio'
     autoUpdate: true, // check GitHub Releases for new versions
@@ -38,15 +42,23 @@ function defaults(downloadsDir) {
 }
 
 class Settings {
-  constructor(file, downloadsDir) {
+  /** secrets: { encrypt(text), decrypt(text) } from the OS; without it the proxy password isn't saved. */
+  constructor(file, downloadsDir, secrets = null) {
     this.file = file;
+    this.secrets = secrets;
     this.data = defaults(downloadsDir);
     this.listeners = new Set();
     try {
       const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
       this.data = merge(this.data, saved);
     } catch {
-      /* first run */
+      this.isFirstRun = true; // no settings file yet: a fresh install
+    }
+    // the proxy password is stored encrypted (passwordEnc) and only held decrypted in memory
+    const px = this.data.proxy;
+    if (px.passwordEnc) {
+      px.password = (this.secrets && safe(() => this.secrets.decrypt(px.passwordEnc))) || '';
+      delete px.passwordEnc;
     }
     // Older versions stored 'system' (or a theme that no longer exists).
     if (!THEME_IDS.includes(this.data.theme)) this.data.theme = 'light';
@@ -75,10 +87,26 @@ class Settings {
     this.listeners.add(fn);
   }
 
+  /** The settings as the windows see them: never the proxy password, only whether one is set. */
+  forRenderer() {
+    const d = JSON.parse(JSON.stringify(this.data));
+    d.proxy.hasPassword = !!d.proxy.password;
+    d.proxy.password = '';
+    delete d.proxy.passwordEnc;
+    return d;
+  }
+
   save() {
     try {
       fs.mkdirSync(path.dirname(this.file), { recursive: true });
-      fs.writeFileSync(this.file + '.tmp', JSON.stringify(this.data, null, 2));
+      const out = JSON.parse(JSON.stringify(this.data));
+      if (out.proxy.password) {
+        const enc = this.secrets && safe(() => this.secrets.encrypt(out.proxy.password));
+        if (enc) out.proxy.passwordEnc = enc;
+      }
+      delete out.proxy.password;
+      if (!out.proxy.passwordEnc) delete out.proxy.passwordEnc;
+      fs.writeFileSync(this.file + '.tmp', JSON.stringify(out, null, 2));
       fs.renameSync(this.file + '.tmp', this.file);
     } catch (e) {
       console.error('settings save failed', e);
@@ -135,14 +163,46 @@ function sanitizeQueues(list, base = {}) {
   return out.slice(0, 20);
 }
 
+function safe(fn) {
+  try {
+    return fn();
+  } catch {
+    return null;
+  }
+}
+
+function sanitizeProxy(p) {
+  const str = (v, max) => String(v == null ? '' : v).slice(0, max);
+  const out = {};
+  if ('mode' in p && ['none', 'system', 'manual'].includes(p.mode)) out.mode = p.mode;
+  if ('type' in p && ['http', 'socks5'].includes(p.type)) out.type = p.type;
+  if ('host' in p) {
+    // accept "http://host:3128/" pasted whole: keep the host, and take the port from it when none is given
+    let host = str(p.host, 255).trim().replace(/^[a-z0-9+.-]+:\/\//i, '').replace(/[\s/]+.*$/, '');
+    const m = /^([^:]+):(\d{1,5})$/.exec(host);
+    if (m) {
+      host = m[1];
+      if (!(Number(p.port) > 0)) out.port = clamp(m[2], 0, 65535, 0);
+    }
+    out.host = host;
+  }
+  if ('port' in p && !('port' in out)) out.port = clamp(p.port, 0, 65535, 0);
+  if ('username' in p) out.username = str(p.username, 256);
+  if ('password' in p) out.password = str(p.password, 256);
+  return out;
+}
+
 function sanitizePatch(p) {
   const out = { ...p };
+  if ('proxy' in out) out.proxy = out.proxy && typeof out.proxy === 'object' ? sanitizeProxy(out.proxy) : {};
   if ('queues' in out) out.queues = sanitizeQueues(out.queues);
   if ('connections' in out) out.connections = clamp(out.connections, 1, 32, 8);
   if ('maxConcurrent' in out) out.maxConcurrent = clamp(out.maxConcurrent, 1, 20, 1);
   if ('speedLimit' in out) out.speedLimit = clamp(out.speedLimit, 0, 10_000_000, 0);
   if ('maxRetries' in out) out.maxRetries = clamp(out.maxRetries, 0, 100, 10);
   if ('theme' in out && !THEME_IDS.includes(out.theme)) delete out.theme;
+  if ('lastSeenVersion' in out) out.lastSeenVersion = /^\d+\.\d+\.\d+$/.test(String(out.lastSeenVersion)) ? String(out.lastSeenVersion) : null;
+  if ('language' in out && !['en', 'fa'].includes(out.language)) delete out.language;
   if ('listView' in out && !['cards', 'compact'].includes(out.listView)) delete out.listView;
   if ('videoQuality' in out && !['best', '2160', '1080', '720', '480', '360', 'audio'].includes(String(out.videoQuality))) delete out.videoQuality;
   return out;

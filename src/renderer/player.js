@@ -5,7 +5,7 @@
   DM.setTheme('dark');
   const src = params.get('src') || '';
   const video = document.getElementById('video');
-  document.title = params.get('title') || 'Online Watch';
+  document.title = params.get('title') || DM.t('Online Watch');
 
   const fail = (why) => {
     document.getElementById('loading').hidden = true;
@@ -19,11 +19,11 @@
 
   document.getElementById('external').addEventListener('click', async () => {
     const r = await api.invoke('player:external', { url: src });
-    if (!r.ok) toast('No external player found — install VLC or PotPlayer', 3500);
+    if (!r.ok) toast(DM.t('No external player found — install VLC or PotPlayer'), 3500);
   });
   document.getElementById('copy').addEventListener('click', async () => {
     await navigator.clipboard.writeText(src).catch(() => {});
-    toast('Link copied');
+    toast(DM.t('Link copied'));
   });
   document.addEventListener('keydown', (e) => {
     if (e.key === ' ' && document.activeElement !== video) {

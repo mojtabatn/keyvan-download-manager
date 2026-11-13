@@ -1,0 +1,66 @@
+/* Right-to-left (Persian): mirrors every fixed left/right position of the left-to-right design.
+   Flex rows (toolbar, menu, settings rows…) flip by themselves because the page has dir="rtl". */
+
+/* The title bar keeps the system's order: app icon on the left, caption buttons on the right. */
+:root[dir='rtl'] .titlebar { direction: ltr; text-align: left; }
+:root[dir='rtl'] .titlebar .tb-title { direction: rtl; }
+/* things that are always written left-to-right: addresses, login, numbers in fields */
+:root[dir='rtl'] [data-ltr] { direction: ltr; text-align: left; }
+:root[dir='rtl'] .theme-preview { direction: ltr; }
+
+/* ---- main window frame */
+:root[dir='rtl'] .sidebar { left: auto; right: 8px; }
+:root[dir='rtl'] .content { left: 8px; right: 188px; }
+:root[dir='rtl'] .nav-item { padding-left: 0; padding-right: 15px; text-align: right; }
+:root[dir='rtl'] .badge { margin-left: 12px; margin-right: auto; }
+:root[dir='rtl'] .side-foot { padding: 0 8px 4px 0; }
+:root[dir='rtl'] .total-speed { margin: 0 8px 8px 0; }
+:root[dir='rtl'] .update-btn { margin: 0 -8px 12px 0; text-align: right; }
+:root[dir='rtl'] .update-btn .u-fill { left: auto; right: 0; }
+
+/* ---- toolbar */
+:root[dir='rtl'] .search-icon { left: auto; right: 8px; }
+:root[dir='rtl'] .search-clear { right: auto; left: 0; }
+:root[dir='rtl'] .actions .tool-btn.select-all[data-tip]:hover::after { right: auto; left: -10px; }
+
+/* ---- download list */
+:root[dir='rtl'] .list { padding: 8px 8px 8px 7px; }
+:root[dir='rtl'] .row .cat { left: auto; right: 4px; }
+:root[dir='rtl'] .row .name { left: 72px; right: 50px; text-align: right; }
+:root[dir='rtl'] .row.done .name { left: 96px; right: 50px; }
+:root[dir='rtl'] .row .acts { right: auto; left: 4px; justify-content: flex-start; }
+:root[dir='rtl'] .row .done-meta { right: auto; left: 8px; }
+:root[dir='rtl'] .row .meta .speed { left: auto; right: 0; }
+:root[dir='rtl'] .row .meta .size { right: auto; left: 0; }
+:root[dir='rtl'] .row .bar .fill, :root[dir='rtl'] .bar .fill { inset: 0 0 0 auto; }
+:root[dir='rtl'] .bar.indeterminate .fill { animation-name: indet-rtl; }
+
+/* compact list: name, size, status, last try from the right */
+:root[dir='rtl'] .list.compact .row .cat { left: auto; right: 10px; }
+:root[dir='rtl'] .list.compact .row .name { left: 318px; right: 38px; }
+:root[dir='rtl'] .list.compact .row .c-size { right: auto; left: 232px; text-align: left; }
+:root[dir='rtl'] .list.compact .row .c-stat { right: auto; left: 126px; text-align: left; }
+:root[dir='rtl'] .list.compact .row .c-try { right: auto; left: 10px; text-align: left; }
+
+/* ---- queue panel */
+:root[dir='rtl'] .qp-tools { margin-left: 0; margin-right: auto; }
+:root[dir='rtl'] .qp-status { margin-left: 0; margin-right: 4px; }
+
+/* ---- settings and shared controls */
+:root[dir='rtl'] .steps { padding-left: 0; padding-right: 22px; list-style-type: persian; }
+:root[dir='rtl'] .folder-field img { left: auto; right: 11px; }
+:root[dir='rtl'] .folder-field .path { left: 90px; right: 42px; }
+:root[dir='rtl'] .folder-field .browse { right: auto; left: 13px; }
+:root[dir='rtl'] .switch span::after { left: auto; right: 2px; }
+:root[dir='rtl'] .switch input:checked + span::after { transform: translateX(-14px); }
+:root[dir='rtl'] select.field { padding-right: 9px; padding-left: 26px; background-position: left 6px center; }
+
+/* ---- dialogs */
+:root[dir='rtl'] .det-head .muted { margin-left: 0; margin-right: auto; }
+:root[dir='rtl'] .dl-meta.speed { text-align: right; }
+
+/* file names are often English: cut them at their own end, and keep them against the icon */
+:root[dir='rtl'] .row .name, :root[dir='rtl'] .dl-name { unicode-bidi: plaintext; }
+:root[dir='rtl'] .row .name, :root[dir='rtl'] .dl-name { text-align: right; }
+
+@keyframes indet-rtl { 0% { right: -30%; } 100% { right: 100%; } }

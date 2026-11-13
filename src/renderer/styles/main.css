@@ -221,7 +221,8 @@
 .list:empty { display: none; }
 
 .row { position: relative; height: 62px; border-radius: 5px; cursor: default; }
-.row + .divider { height: 1px; background: var(--line); margin: 8px 0; }
+/* no line between downloads: only a little air */
+.row + .divider { height: 0; background: none; margin: 4px 0; }
 .row.done { height: 32px; }
 .row:hover { background: var(--hover); }
 .row.selected, .row.selected:hover { background: var(--select); }
@@ -253,7 +254,7 @@
 .row.done:hover .done-meta { opacity: 1; }
 
 /* compact-list cells are only shown in the "list without icons" view */
-.row .c-size, .row .c-stat { display: none; }
+.row .c-size, .row .c-stat, .row .c-try { display: none; }
 
 /* ------------------------------------------------ compact list (small icons) */
 .list.compact .row { height: 32px; }
@@ -262,11 +263,13 @@
 .list.compact .row .meta,
 .list.compact .row .done-meta { display: none; }
 .list.compact .row .cat { left: 10px; top: 9px; width: 20px; height: 13px; border-radius: 2px; }
-.list.compact .row .name { left: 38px; right: 210px; top: 7px; }
+.list.compact .row .name { left: 38px; right: 318px; top: 7px; }
 .list.compact .row .c-size,
-.list.compact .row .c-stat { display: block; position: absolute; top: 8px; font-size: 11px; line-height: 16px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.list.compact .row .c-size { right: 120px; width: 80px; text-align: right; color: var(--text-3); }
-.list.compact .row .c-stat { right: 10px; width: 104px; text-align: right; color: var(--text-3); }
+.list.compact .row .c-stat,
+.list.compact .row .c-try { display: block; position: absolute; top: 8px; font-size: 11px; line-height: 16px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.list.compact .row .c-size { right: 232px; width: 76px; text-align: right; color: var(--text-3); }
+.list.compact .row .c-stat { right: 126px; width: 100px; text-align: right; color: var(--text-3); }
+.list.compact .row .c-try { right: 10px; width: 110px; text-align: right; color: var(--text-3); font-weight: 500; font-variant-numeric: tabular-nums; }
 .list.compact .row .c-stat.downloading,
 .list.compact .row .c-stat.connecting { color: var(--blue); }
 .list.compact .row .c-stat.error { color: var(--red); }
@@ -321,6 +324,15 @@
 .q-add { flex: none; height: 30px; padding: 0 10px; display: flex; align-items: center; gap: 4px; border-radius: 6px; border: 1px dashed var(--stroke); color: var(--text-3); font-size: 12px; font-weight: 600; }
 .q-add:hover { color: var(--link); border-color: var(--link); }
 .q-add svg { width: 12px; height: 12px; }
+.proxy-manual { padding: 0 0 4px; }
+.proxy-line { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
+.proxy-line .field { height: 30px; font-size: 13px; width: auto; }
+.proxy-lbl { width: 64px; flex: none; font-size: 13px; color: var(--text-2); }
+.proxy-test { margin: 6px 0 4px; }
+.proxy-manual[hidden], .proxy-test[hidden] { display: none; }
+.proxy-result { margin: 0; font-size: 12px; }
+.proxy-result.ok { color: var(--green-text); }
+.proxy-result.bad { color: var(--red); }
 .qp-tools { margin-left: auto; display: flex; gap: 4px; }
 .qp-tool { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 6px; color: var(--text-3); }
 .qp-tool svg { width: 16px; height: 16px; }

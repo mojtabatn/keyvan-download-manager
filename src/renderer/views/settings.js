@@ -1,7 +1,7 @@
 'use strict';
 /* Settings view rendered inside the main card. */
 window.SettingsView = (function () {
-  const { el, icon } = DM;
+  const { el, icon, t } = DM;
   let root;
   let s;
   const bind = []; // [{ key, apply(settings) }]
@@ -74,7 +74,7 @@ window.SettingsView = (function () {
       'div',
       { class: 'set-row creator' },
       el('div', { class: 'set-text' }, el('div', { class: 'set-hint', text: 'Made by' }), el('div', { class: 'set-label', text: 'Mojtaba Navade' })),
-      el('div', { class: 'socials' }, link('telegram', 'Telegram · t.me/mojtabatn', telegram), link('instagram', 'Instagram · instagram.com/mojtabanavade', instagram))
+      el('div', { class: 'socials' }, link('telegram', t('Telegram · t.me/mojtabatn'), telegram), link('instagram', t('Instagram · instagram.com/mojtabanavade'), instagram))
     );
   }
 
@@ -84,15 +84,15 @@ window.SettingsView = (function () {
     const btn = el('button', { class: 'btn btn-outline text-only', style: 'height:30px;padding:0 12px;font-size:13px', text: 'Check now' });
     const show = (st) => {
       if (!st) return;
-      const when = st.checkedAt ? new Date(st.checkedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+      const when = st.checkedAt ? DM.digits(new Date(st.checkedAt).toLocaleTimeString(DM.FA ? 'fa-IR' : [], { hour: '2-digit', minute: '2-digit' })) : '';
       const text = {
-        idle: 'Not checked yet.',
-        checking: 'Checking…',
-        none: `You have the latest version${when ? ` (checked at ${when})` : ''}.`,
-        available: `Version ${st.version} is available. Use the red button in the sidebar.`,
-        downloading: `Downloading version ${st.version}…`,
-        ready: `Version ${st.version} is ready. Click “Restart to Update” in the sidebar.`,
-        error: `Couldn’t check for updates: ${st.error || 'unknown error'}.`,
+        idle: t('Not checked yet.'),
+        checking: t('Checking…'),
+        none: when ? t('You have the latest version (checked at {time}).', { time: when }) : t('You have the latest version.'),
+        available: t('Version {v} is available. Use the red button in the sidebar.', { v: DM.v(st.version) }),
+        downloading: t('Downloading version {v}…', { v: DM.v(st.version) }),
+        ready: t('Version {v} is ready. Click “Restart to Update” in the sidebar.', { v: DM.v(st.version) }),
+        error: t('Couldn’t check for updates: {e}.', { e: st.error || t('unknown error') }),
       }[st.status];
       hint.textContent = text || '';
       btn.disabled = st.status === 'checking' || st.status === 'downloading';
@@ -105,7 +105,7 @@ window.SettingsView = (function () {
 
   function themePicker() {
     const cards = THEMES.map(([id, name]) => {
-      const card = el('button', { class: 'theme-card', title: `${name} theme`, onclick: () => save({ theme: id }) }, miniPreview(id), el('span', { text: name }));
+      const card = el('button', { class: 'theme-card', title: t('{name} theme', { name: t(name) }), onclick: () => save({ theme: id }) }, miniPreview(id), el('span', { text: name }));
       card.dataset.v = id;
       return card;
     });
@@ -124,6 +124,75 @@ window.SettingsView = (function () {
     return f;
   }
 
+  /** Proxy: none / the system's / manual (HTTP or SOCKS5, optional login) with a Test button. */
+  function proxyRows() {
+    const px = () => (s && s.proxy) || {};
+    const patch = (p) => save({ proxy: p });
+    const input = (attrs, key, parse = (v) => v) => {
+      const i = el('input', { class: 'field', spellcheck: 'false', autocomplete: 'off', 'data-ltr': '', ...attrs });
+      i.addEventListener('change', () => patch({ [key]: parse(i.value) }));
+      return i;
+    };
+    const host = input({ type: 'text', placeholder: '127.0.0.1', style: 'flex:1;min-width:0' }, 'host');
+    const port = input({ type: 'number', placeholder: '1080', min: '1', max: '65535', style: 'width:84px' }, 'port', (v) => Number(v) || 0);
+    const user = input({ type: 'text', placeholder: t('Username'), style: 'flex:1;min-width:0' }, 'username');
+    const pass = input({ type: 'password', placeholder: t('Password'), style: 'flex:1;min-width:0' }, 'password');
+    const mode = select(
+      [
+        ['none', 'No proxy'],
+        ['system', 'Use the system proxy'],
+        ['manual', 'Manual'],
+      ],
+      (x) => x.proxy.mode,
+      (v) => patch({ mode: v })
+    );
+    const type = select(
+      [
+        ['http', 'HTTP / HTTPS'],
+        ['socks5', 'SOCKS5'],
+      ],
+      (x) => x.proxy.type,
+      (v) => patch({ type: v }),
+      'small'
+    );
+    type.style.width = '140px';
+    const result = el('div', { class: 'set-hint proxy-result' });
+    const test = el('button', { class: 'btn btn-outline blue text-only', style: 'height:30px;padding:0 14px;font-size:13px', text: 'Test connection' });
+    test.addEventListener('click', async () => {
+      test.disabled = true;
+      result.className = 'set-hint proxy-result';
+      result.textContent = t('Testing…');
+      const r = await api.invoke('proxy:test', { mode: px().mode, type: px().type, host: host.value, port: Number(port.value) || 0, username: user.value, password: pass.value });
+      test.disabled = false;
+      result.className = `set-hint proxy-result ${r.ok ? 'ok' : 'bad'}`;
+      result.textContent = r.ok ? t('Working · {ms} ms', { ms: DM.n(r.ms) }) : r.error || t('Could not connect through this proxy.');
+    });
+    const manual = el(
+      'div',
+      { class: 'proxy-manual' },
+      el('div', { class: 'proxy-line' }, el('span', { class: 'proxy-lbl', text: 'Type' }), type),
+      el('div', { class: 'proxy-line' }, el('span', { class: 'proxy-lbl', text: 'Server' }), host, port),
+      el('div', { class: 'proxy-line' }, el('span', { class: 'proxy-lbl', text: 'Login' }), user, pass),
+      el('div', { class: 'set-hint', style: 'margin:2px 0 0', text: 'Leave the login empty if the proxy doesn’t need one. The password is stored encrypted.' })
+    );
+    const testRow = el('div', { class: 'proxy-line proxy-test' }, test, result);
+    bind.push({
+      apply: (x) => {
+        const p = x.proxy;
+        if (document.activeElement !== host) host.value = p.host || '';
+        if (document.activeElement !== port) port.value = p.port ? String(p.port) : '';
+        if (document.activeElement !== user) user.value = p.username || '';
+        if (document.activeElement !== pass) {
+          pass.value = '';
+          pass.placeholder = p.hasPassword ? '••••••••' : t('Password');
+        }
+        manual.hidden = p.mode !== 'manual';
+        testRow.hidden = p.mode === 'none';
+      },
+    });
+    return [row('Proxy', 'Used for downloads, video downloads and update checks. A running download uses it the next time it connects.', mode), manual, testRow];
+  }
+
   /** yt-dlp + ffmpeg status with an Install / Update button. */
   function videoTools() {
     const line = el('div', { class: 'set-hint', style: 'font-size:12px' });
@@ -134,14 +203,14 @@ window.SettingsView = (function () {
       const st = await api.invoke('media:status');
       ready = st.ready;
       line.textContent = st.ready
-        ? `Installed · yt-dlp ${st.ytdlp.version || ''} · ffmpeg`
-        : `Not installed yet · one-time download of about ${st.downloadSize} MB (yt-dlp + ffmpeg)`;
-      btn.textContent = st.ready ? 'Update' : 'Install';
+        ? t('Installed · yt-dlp {v} · ffmpeg', { v: st.ytdlp.version || '' })
+        : t('Not installed yet · one-time download of about {n} MB (yt-dlp + ffmpeg)', { n: DM.n(st.downloadSize) });
+      btn.textContent = t(st.ready ? 'Update' : 'Install');
       btn.disabled = st.installing;
     };
     btn.addEventListener('click', async () => {
       btn.disabled = true;
-      btn.textContent = ready ? 'Updating…' : 'Installing…';
+      btn.textContent = t(ready ? 'Updating…' : 'Installing…');
       bar.hidden = ready;
       const off = api.on('media:install-progress', (p) => {
         if (p.total > 0) bar.firstChild.style.width = `${((p.received / p.total) * 100).toFixed(1)}%`;
@@ -151,7 +220,7 @@ window.SettingsView = (function () {
       bar.hidden = true;
       await refresh();
       if (r && r.error) DM.toast(r.error, 4000);
-      else DM.toast(ready ? 'Video support is up to date' : 'Video support installed');
+      else DM.toast(t(ready ? 'Video support is up to date' : 'Video support installed'));
     });
     refresh();
     return el('div', { class: 'set-row' }, el('div', { class: 'set-text' }, el('div', { class: 'set-label', text: 'Video support (yt-dlp + ffmpeg)' }), line, bar), btn);
@@ -160,21 +229,14 @@ window.SettingsView = (function () {
   function mount(container, settings, info) {
     root = container;
     s = settings;
-    const KB = [
-      [0, 'Unlimited'],
-      [128, '128 KB/s'],
-      [256, '256 KB/s'],
-      [512, '512 KB/s'],
-      [1024, '1 MB/s'],
-      [2048, '2 MB/s'],
-      [5120, '5 MB/s'],
-      [10240, '10 MB/s'],
-    ];
+    const speedLabel = (kb) => (kb === 0 ? t('Unlimited') : DM.digits(kb >= 1024 ? `${kb / 1024} ${t('MB')}/${t('s')}` : `${kb} ${t('KB')}/${t('s')}`));
+    const KB = [0, 128, 256, 512, 1024, 2048, 5120, 10240].map((k) => [k, speedLabel(k)]);
     root.append(
       group('Theme', 'theme', themePicker()),
       group(
         'General',
         'general',
+        row('Language', 'The app reloads to show the new language.', select(I18N.LANGS.map((l) => [l.id, l.name]), (x) => x.language || 'en', (v) => save({ language: v }))),
         row('Keep running in the tray', 'Closing the window keeps downloads going.', toggle((x) => x.closeToTray, (v) => save({ closeToTray: v }))),
         row(/Macintosh/.test(navigator.userAgent) ? 'Open at login' : 'Launch at Windows startup', /Macintosh/.test(navigator.userAgent) ? 'Starts in the menu bar.' : 'Starts minimized to the tray.', toggle((x) => x.launchAtStartup, (v) => save({ launchAtStartup: v }))),
         row('Notifications', 'Show a notification when a download finishes or fails.', toggle((x) => x.notifications, (v) => save({ notifications: v })))
@@ -187,7 +249,7 @@ window.SettingsView = (function () {
         row(
           'Connections per download',
           'More connections = faster on most servers (IDM uses 8).',
-          select([1, 2, 4, 6, 8, 12, 16, 24, 32].map((n) => [n, String(n)]), (x) => x.connections, (v) => save({ connections: Number(v) }), 'small')
+          select([1, 2, 4, 6, 8, 12, 16, 24, 32].map((n) => [n, DM.n(n)]), (x) => x.connections, (v) => save({ connections: Number(v) }), 'small')
         ),
         row('Speed limit', 'Applies to all downloads together.', select(KB, (x) => (KB.some(([k]) => k === x.speedLimit) ? x.speedLimit : 0), (v) => save({ speedLimit: Number(v) }))),
         row('Show progress window', 'Open a small window for each download (like IDM).', toggle((x) => x.showProgressWindow, (v) => save({ showProgressWindow: v }))),
@@ -195,6 +257,7 @@ window.SettingsView = (function () {
         row('Watch clipboard for links', 'Copying a file link opens the Add Link window.', toggle((x) => x.clipboardWatch, (v) => save({ clipboardWatch: v }))),
         row('Prevent sleep while downloading', null, toggle((x) => x.preventSleep, (v) => save({ preventSleep: v })))
       ),
+      group('Proxy', 'proxy', ...proxyRows()),
       group(
         'Video downloads',
         'video',
@@ -214,7 +277,7 @@ window.SettingsView = (function () {
         el(
           'ol',
           { class: 'steps' },
-          el('li', {}, 'Open ', el('code', { text: 'edge://extensions' }), ' or ', el('code', { text: 'chrome://extensions' })),
+          el('li', {}, DM.rich('Open {a} or {b}', { a: el('code', { text: 'edge://extensions' }), b: el('code', { text: 'chrome://extensions' }) })),
           el('li', { text: 'Turn on “Developer mode”, click “Load unpacked”' }),
           el('li', { text: 'Select the extension folder below' })
         ),
@@ -227,9 +290,15 @@ window.SettingsView = (function () {
           'div',
           { class: 'about', style: 'padding:4px 0 8px' },
           el('img', { src: 'assets/icons/logo.svg', alt: '' }),
-          el('div', {}, el('div', { class: 'set-label', text: `Keyvan Download Manager ${String(info.version).replace(/\.0$/, '')}` }), el('div', { class: 'set-hint', text: 'KDM · minimal, multi-connection download manager.' }))
+          el('div', {}, el('div', { class: 'set-label', text: `${t('Keyvan Download Manager')} ${DM.v(String(info.version).replace(/\.0$/, ''))}` }), el('div', { class: 'set-hint', text: 'KDM · minimal, multi-connection download manager.' }))
         ),
         creator(),
+        el(
+          'div',
+          { class: 'set-row' },
+          el('div', { class: 'set-text' }, el('div', { class: 'set-label', text: 'What’s new' }), el('div', { class: 'set-hint', text: 'See what changed in this version.' })),
+          el('button', { class: 'btn btn-outline text-only', style: 'height:30px;padding:0 12px;font-size:13px', text: 'Show', onclick: () => api.invoke('whatsnew:open') })
+        ),
         row('Check for updates automatically', 'KDM looks for new versions on GitHub and shows a button when one is ready.', toggle((x) => x.autoUpdate !== false, (v) => save({ autoUpdate: v }))),
         updateRow()
       )

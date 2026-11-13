@@ -1,5 +1,7 @@
 'use strict';
 
+const { t } = require('../../shared/i18n');
+
 const fs = require('fs');
 const fsp = fs.promises;
 const path = require('path');
@@ -8,6 +10,7 @@ const crypto = require('crypto');
 const { execFile } = require('child_process');
 const { pipeline } = require('stream/promises');
 const { request } = require('../engine/http');
+const proxyConfig = require('../engine/proxy');
 
 /**
  * Video support needs two helper programs that are downloaded on first use
@@ -108,7 +111,7 @@ class Components {
           if (res.statusCode !== 200) {
             res.resume();
             req.destroy();
-            throw new Error(`Could not download ${name} (HTTP ${res.statusCode})`);
+            throw new Error(t('Could not download {name} (HTTP {code})', { name, code: res.statusCode }));
           }
           totals.set(name, Number(res.headers['content-length']) || 0);
           got.set(name, 0);
@@ -124,7 +127,7 @@ class Components {
           // the hash covers the file exactly as published (the .gz for ffmpeg)
           if (hash.digest('hex') !== sha256) {
             await fsp.rm(tmp, { force: true });
-            throw new Error(`The downloaded ${name === 'ytdlp' ? 'yt-dlp' : 'ffmpeg'} failed its integrity check and was deleted`);
+            throw new Error(t('The downloaded {name} failed its integrity check and was deleted', { name: name === 'ytdlp' ? 'yt-dlp' : 'ffmpeg' }));
           }
           await fsp.rename(tmp, dest);
           if (process.platform !== 'win32') await fsp.chmod(dest, 0o755);
@@ -163,7 +166,8 @@ class Components {
   /** yt-dlp updates itself in place (sites change often, so this matters). */
   async update() {
     if (!fs.existsSync(this.ytdlpPath)) return this.install();
-    await this.run(this.ytdlpPath, ['-U'], 120000).catch(async () => {
+    const proxyArgs = await proxyConfig.ytdlpArgs('https://github.com/').catch(() => []);
+    await this.run(this.ytdlpPath, ['-U', ...proxyArgs], 120000).catch(async () => {
       // Fall back to a fresh download if self-update isn't possible.
       await fsp.rm(this.ytdlpPath, { force: true });
       await this.install();

@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="styles/base.css" />
     <link rel="stylesheet" href="styles/themes.css" />
     <link rel="stylesheet" href="styles/dialog.css" />
+    <link rel="stylesheet" href="styles/rtl.css" />
   </head>
   <body class="dialog">
     <header class="titlebar">
@@ -17,7 +18,7 @@
     <!-- Step 1: Add link (580×154) -->
     <form class="page pane" id="paneAdd" autocomplete="off">
       <label class="label at" style="left: 24px; top: 24px" for="address" id="addrLabel">Address:</label>
-      <input class="field at" id="address" style="left: 24px; top: 48px; width: 532px" spellcheck="false" placeholder="https://   ·   tip: file.part[01-10].rar adds 10 links" />
+      <input class="field at" data-ltr id="address" style="left: 24px; top: 48px; width: 532px" spellcheck="false" placeholder="https://   ·   tip: file.part[01-10].rar adds 10 links" />
       <div class="status at" id="addStatus" style="left: 24px; top: 92px"></div>
       <button type="button" class="btn btn-secondary at" id="addCancel" style="right: 117px; bottom: 24px"><img src="assets/icons/btn-x.svg" alt="" /><span>Cancel</span></button>
       <button type="submit" class="btn btn-primary at ok" id="addOk" style="right: 24px; bottom: 24px"><span>Ok</span></button>
@@ -58,7 +59,7 @@
       <div class="media-state" id="mediaInstall" hidden>
         <img src="assets/icons/logo.svg" alt="" class="ms-logo" />
         <div class="ms-title">Turn on video downloads</div>
-        <div class="ms-sub">Downloading videos from YouTube, X and 1000+ sites needs two free helpers, <b>yt-dlp</b> and <b>ffmpeg</b>. It’s a one-time download of about <span id="mediaInstallSize">53</span> MB.</div>
+        <div class="ms-sub" id="mediaInstallSub"></div>
         <div class="ms-progress" id="mediaInstallProgress" hidden><div class="bar"><div class="fill" id="mediaInstallFill"></div></div><span id="mediaInstallText"></span></div>
         <button type="button" class="btn btn-primary text-only" id="mediaInstallBtn">Install video support</button>
       </div>
@@ -101,6 +102,8 @@
       </div>
     </form>
 
+    <script src="../shared/i18n.js"></script>
+    <script src="../shared/locale-fa.js"></script>
     <script src="common.js"></script>
     <script src="dialog.js"></script>
   </body>

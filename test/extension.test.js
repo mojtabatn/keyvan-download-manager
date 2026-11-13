@@ -44,7 +44,7 @@ function loadExtension() {
     sent.push(JSON.parse(opts.body).url);
     return { ok: true, json: async () => ({ ok: true }) };
   };
-  const ctx = { chrome, fetch, navigator: { userAgent: 'test' }, console, setTimeout, clearTimeout, AbortController, URL, Date, Promise, JSON, Math, Set, Map };
+  const ctx = { importScripts: (f) => vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'extension', f), 'utf8'), ctx), chrome, fetch, navigator: { userAgent: 'test' }, console, setTimeout, clearTimeout, AbortController, URL, Date, Promise, JSON, Math, Set, Map };
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '..', 'extension', 'background.js'), 'utf8'), ctx);
   return { created: listeners.created, sent };
 }

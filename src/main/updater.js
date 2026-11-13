@@ -1,5 +1,7 @@
 'use strict';
 
+const { t, digits: D } = require('../shared/i18n');
+
 const fs = require('fs');
 const fsp = fs.promises;
 const path = require('path');
@@ -82,8 +84,8 @@ class Updater extends EventEmitter {
     const { asset } = this.state;
     if (this.state.status === 'ready') return this.state;
     if (this.downloading) return this.downloading;
-    if (!asset || this.portable) throw new Error('Nothing to download');
-    if (!this.allowed.some((p) => String(asset.url).startsWith(p))) throw new Error('Unexpected download location');
+    if (!asset || this.portable) throw new Error(t('Nothing to download'));
+    if (!this.allowed.some((p) => String(asset.url).startsWith(p))) throw new Error(t('Unexpected download location'));
     this.downloading = (async () => {
       this.set({ status: 'downloading', progress: { received: 0, total: asset.size || 0 }, error: null });
       const dest = path.join(this.cacheDir, asset.name);
@@ -94,7 +96,7 @@ class Updater extends EventEmitter {
         if (res.statusCode !== 200) {
           res.resume();
           req.destroy();
-          throw new Error(`Download failed (HTTP ${res.statusCode})`);
+          throw new Error(t('Download failed (HTTP {code})', { code: D(res.statusCode) }));
         }
         const total = Number(res.headers['content-length']) || asset.size || 0;
         const hash = crypto.createHash('sha256');
@@ -116,15 +118,15 @@ class Updater extends EventEmitter {
           out.on('finish', resolve);
           res.pipe(out);
         });
-        if (asset.size && received !== asset.size) throw new Error('The download was incomplete');
+        if (asset.size && received !== asset.size) throw new Error(t('The download was incomplete'));
         const m = /^sha256:([0-9a-f]{64})$/i.exec(asset.digest || '');
-        if (m && hash.digest('hex') !== m[1].toLowerCase()) throw new Error('The downloaded file is damaged');
+        if (m && hash.digest('hex') !== m[1].toLowerCase()) throw new Error(t('The downloaded file is damaged'));
         await fsp.rename(part, dest);
         this.set({ status: 'ready', file: dest, progress: { received, total: received } });
       } catch (e) {
         await fsp.rm(part, { force: true }).catch(() => {});
         // connection dropped mid-file
-        if (e && (e.message === 'aborted' || e.code === 'ECONNRESET')) e = new Error('The download was incomplete');
+        if (e && (e.message === 'aborted' || e.code === 'ECONNRESET')) e = new Error(t('The download was incomplete'));
         this.set({ status: 'error', error: friendly(e), stage: 'download' });
         throw e;
       } finally {
@@ -159,7 +161,7 @@ function getJson(url, version) {
         if (res.statusCode !== 200) {
           res.resume();
           req.destroy();
-          return reject(new Error(`GitHub responded ${res.statusCode}`));
+          return reject(new Error(t('GitHub responded {code}', { code: D(res.statusCode) })));
         }
         let body = '';
         res.setEncoding('utf8');
@@ -171,7 +173,7 @@ function getJson(url, version) {
           try {
             resolve(JSON.parse(body));
           } catch {
-            reject(new Error('Unexpected answer from GitHub'));
+            reject(new Error(t('Unexpected answer from GitHub')));
           }
         });
         res.on('error', reject);
@@ -192,8 +194,8 @@ function compareVersions(a, b) {
 
 function friendly(e) {
   const code = e && e.code;
-  if (['ENOTFOUND', 'EAI_AGAIN', 'ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT'].includes(code)) return 'No internet connection';
-  return (e && e.message) || 'Something went wrong';
+  if (['ENOTFOUND', 'EAI_AGAIN', 'ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT'].includes(code)) return t('No internet connection');
+  return (e && e.message) || t('Something went wrong');
 }
 
 module.exports = { Updater, compareVersions };

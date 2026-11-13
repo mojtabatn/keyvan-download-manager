@@ -1,5 +1,7 @@
 'use strict';
 
+const { t, digits: D } = require('../../shared/i18n');
+
 const fs = require('fs');
 const fsp = fs.promises;
 const path = require('path');
@@ -59,26 +61,27 @@ async function probe(url, { headers = {}, timeout = 20000, signal } = {}) {
 }
 
 function friendlyError(err) {
-  if (!err) return 'Unknown error';
+  if (!err) return t('Unknown error');
   if (err instanceof HttpError) {
     switch (err.status) {
-      case 401: return 'Authorization required (401)';
-      case 403: return 'Access denied (403) — the link may have expired. Use “Refresh link”.';
-      case 404: return 'File not found on server (404)';
-      case 410: return 'Link expired (410) — use “Refresh link”.';
-      case 416: return err.message.includes('resum') ? err.message : 'Server rejected the byte range (416)';
-      case 429: return 'Server is rate-limiting (429)';
-      default: return `Server error (${err.status})`;
+      case 401: return t('Authorization required (401)');
+      case 403: return t('Access denied (403) — the link may have expired. Use “Refresh link”.');
+      case 404: return t('File not found on server (404)');
+      case 410: return t('Link expired (410) — use “Refresh link”.');
+      case 416: return err.message.includes('resum') ? err.message : t('Server rejected the byte range (416)');
+      case 429: return t('Server is rate-limiting (429)');
+      default: return t('Server error ({n})', { n: D(err.status) });
     }
   }
   const code = err.code || (/\b(E[A-Z]{3,})\b/.exec(err.message || '') || [])[1] || '';
-  if (code === 'ENOSPC') return 'Not enough disk space';
-  if (code === 'EACCES' || code === 'EPERM') return 'No permission to write to the folder';
-  if (code === 'ENOTFOUND' || code === 'EAI_AGAIN') return 'Server not found — check the address or your connection';
-  if (code === 'ECONNREFUSED') return 'Connection refused by server';
-  if (code === 'ECONNRESET') return 'Connection was reset';
-  if (code === 'ETIMEDOUT' || /timed out/i.test(err.message || '')) return 'Connection timed out';
-  return err.message || String(err);
+  if (code === 'ENOSPC') return t('Not enough disk space');
+  if (code === 'EACCES' || code === 'EPERM') return t('No permission to write to the folder');
+  if (code === 'ENOTFOUND' || code === 'EAI_AGAIN') return t('Server not found — check the address or your connection');
+  if (code === 'ECONNREFUSED') return t('Connection refused by server');
+  if (code === 'ECONNRESET') return t('Connection was reset');
+  if (code === 'ETIMEDOUT' || /timed out/i.test(err.message || '')) return t('Connection timed out');
+  if (/\b407\b/.test(err.message || '') && /proxy/i.test(err.message || '')) return t('The proxy rejected the username or password.');
+  return t(err.message || String(err));
 }
 
 class Download extends EventEmitter {
@@ -153,6 +156,8 @@ class Download extends EventEmitter {
       createdAt: d.createdAt,
       completedAt: d.completedAt || null,
       startedAt: d.startedAt || null,
+      // downloads from older versions never recorded it: the best guess is when they last ran
+      lastTryAt: d.lastTryAt || d.completedAt || d.startedAt || null,
       activeConnections: this.workers,
       connections: d.connections,
       speedLimit: d.speedLimit || 0,
@@ -230,6 +235,7 @@ class Download extends EventEmitter {
     this.eta = -1;
     this.abortCtl = new AbortController();
     this.d.startedAt = this.d.startedAt || Date.now();
+    this.d.lastTryAt = Date.now(); // every attempt (start, resume, retry) counts as a try
     this.setStatus('connecting');
     this.runPromise = this.run().finally(() => {
       this.running = false;
@@ -404,7 +410,7 @@ class Download extends EventEmitter {
   spawn(seg) {
     seg.active = true;
     this.workers++;
-    const conn = { id: ++this.connSeq, seg, downloaded: 0, status: 'Connecting…' };
+    const conn = { id: ++this.connSeq, seg, downloaded: 0, status: t('Connecting…') };
     this.conns.set(conn.id, conn);
     this.worker(seg, conn)
       .catch((err) => {
@@ -450,7 +456,7 @@ class Download extends EventEmitter {
         seg.pos = off + buf.length;
       };
       try {
-        conn.status = attempt ? `Reconnecting (${attempt})…` : 'Connecting…';
+        conn.status = attempt ? t('Reconnecting ({n})…', { n: D(attempt) }) : t('Connecting…');
         const headers = this.headers();
         const ranged = this.d.resumable && this.d.size > 0;
         if (ranged) headers.Range = `bytes=${seg.recv}-${seg.end}`;
@@ -483,7 +489,7 @@ class Download extends EventEmitter {
         } else if (res.statusCode !== 200 && res.statusCode !== 206) {
           throw new HttpError(res.statusCode);
         }
-        conn.status = 'Receiving data…';
+        conn.status = t('Receiving data…');
         attempt = 0;
         for await (let chunk of res) {
           if (this.halted) break;
@@ -535,7 +541,7 @@ class Download extends EventEmitter {
           return;
         }
         const wait = Math.min(1000 * 2 ** (attempt - 1), 15000);
-        conn.status = `Retrying in ${Math.round(wait / 1000)}s…`;
+        conn.status = t('Retrying in {n}s…', { n: D(Math.round(wait / 1000)) });
         await this.sleep(wait);
       } finally {
         if (req) {

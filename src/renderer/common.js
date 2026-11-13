@@ -14,13 +14,57 @@
     document.documentElement.dataset.base = THEME_BASE[id];
   }
   setTheme(params.get('theme'));
+
+  // ---- language: the main process passes ?lang=fa|en; Persian is right-to-left
+  const { t, digits } = I18N;
+  I18N.setLang(params.get('lang') || 'en');
+  document.documentElement.lang = I18N.getLang();
+  document.documentElement.dir = I18N.dir();
+  document.documentElement.dataset.lang = I18N.getLang();
+  const FA = I18N.getLang() === 'fa';
+
+  /** Translates the page's fixed text (text nodes, title / placeholder / alt) once it has been parsed. */
+  function translateDom(root = document.body) {
+    if (I18N.getLang() === 'en') return;
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const nodes = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+    for (const n of nodes) {
+      const raw = n.nodeValue.trim();
+      if (raw && I18N.has(raw)) n.nodeValue = n.nodeValue.replace(raw, t(raw));
+    }
+    for (const e of root.querySelectorAll('[title],[placeholder],[alt],[aria-label],[data-tip]')) {
+      for (const a of ['title', 'placeholder', 'alt', 'aria-label', 'data-tip']) {
+        const v = e.getAttribute(a);
+        if (v && I18N.has(v)) e.setAttribute(a, t(v));
+      }
+    }
+    if (document.title && I18N.has(document.title)) document.title = t(document.title);
+  }
+  const ready = (fn) => (document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', fn) : fn());
+  /** Right-to-left: swap the inline left / right positions the dialog pages are laid out with. */
+  function mirrorInline() {
+    if (!I18N.isRtl()) return;
+    for (const e of document.querySelectorAll('[style]')) {
+      const l = e.style.left;
+      const r = e.style.right;
+      if (!l && !r) continue;
+      e.style.left = r;
+      e.style.right = l;
+    }
+  }
+  ready(() => {
+    mirrorInline();
+    translateDom();
+  });
   // macOS: traffic lights on the left of the title bar, ⌘ shortcuts
   if (/Macintosh/.test(navigator.userAgent)) document.documentElement.dataset.platform = 'mac';
   window.api.on('theme:changed', setTheme);
 
-  function fmtBytes(n, digits = 2) {
+  // Sizes, speeds and times: Persian shows Persian digits and unit names (مگابایت).
+  function fmtBytes(n, places = 2) {
     if (!(n >= 0)) return '—';
-    if (n < 1024) return `${n} B`;
+    if (n < 1024) return digits(`${n} ${t('B')}`);
     const units = ['KB', 'MB', 'GB', 'TB'];
     let v = n / 1024;
     let i = 0;
@@ -28,27 +72,27 @@
       v /= 1024;
       i++;
     }
-    return `${v.toFixed(i === 0 ? 0 : digits)} ${units[i]}`;
+    return digits(`${v.toFixed(i === 0 ? 0 : places)} ${t(units[i])}`);
   }
 
   function fmtSpeed(bps) {
-    if (!(bps > 0)) return '0 KB/sec';
-    if (bps >= 1024 * 1024) return `${(bps / 1048576).toFixed(1)} MB/sec`;
-    return `${Math.max(1, Math.round(bps / 1024))} KB/sec`;
+    if (!(bps > 0)) return digits(`0 ${t('KB')}/${t('sec')}`);
+    if (bps >= 1024 * 1024) return digits(`${(bps / 1048576).toFixed(1)} ${t('MB')}/${t('sec')}`);
+    return digits(`${Math.max(1, Math.round(bps / 1024))} ${t('KB')}/${t('sec')}`);
   }
 
   function fmtEta(sec) {
     if (!(sec >= 0) || !isFinite(sec)) return '--:--:--';
     sec = Math.round(sec);
-    if (sec > 99 * 3600) return '99:59:59+';
+    if (sec > 99 * 3600) return digits('99:59:59+');
     const h = Math.floor(sec / 3600);
     const m = Math.floor((sec % 3600) / 60);
     const s = sec % 60;
-    return [h, m, s].map((x) => String(x).padStart(2, '0')).join(':');
+    return digits([h, m, s].map((x) => String(x).padStart(2, '0')).join(':'));
   }
 
   function fmtSizePair(d) {
-    if (d.size > 0) return `${fmtBytes(d.downloaded)}/${fmtBytes(d.size)}`;
+    if (d.size > 0) return `${fmtBytes(d.downloaded)}/${fmtBytes(d.size)}`; // right-to-left text reads it in the right order
     return fmtBytes(d.downloaded);
   }
 
@@ -68,7 +112,8 @@
     const e = document.createElement(tag);
     for (const [k, v] of Object.entries(attrs)) {
       if (k === 'class') e.className = v;
-      else if (k === 'text') e.textContent = v;
+      else if (k === 'text') e.textContent = I18N.has(v) ? t(v) : v;
+      else if ((k === 'title' || k === 'placeholder') && typeof v === 'string' && I18N.has(v)) e.setAttribute(k, t(v));
       else if (k.startsWith('on') && typeof v === 'function') e.addEventListener(k.slice(2), v);
       else if (v !== false && v != null) e.setAttribute(k, v === true ? '' : v);
     }
@@ -108,5 +153,16 @@
       .filter((s) => /^https?:\/\/\S+/i.test(s));
   }
 
-  window.DM = { params, setTheme, fmtBytes, fmtSpeed, fmtEta, fmtSizePair, pct, catIcon, el, icon, themedIcon, toast, splitUrls, MEDIA_EXT };
+  /** A translated sentence with {placeholders} replaced by DOM nodes (e.g. <code> elements). */
+  function rich(key, nodes) {
+    const frag = document.createDocumentFragment();
+    for (const part of t(key).split(/(\{\w+\})/)) {
+      const m = /^\{(\w+)\}$/.exec(part);
+      if (m && nodes[m[1]]) frag.append(nodes[m[1]]);
+      else if (part) frag.append(part);
+    }
+    return frag;
+  }
+
+  window.DM = { v: I18N.ver, side: (px) => (I18N.isRtl() ? { right: px } : { left: px }), rich, t, digits, n: (x) => digits(String(x)), dateTime: I18N.dateTime, FA, translateDom, ready, params, setTheme, fmtBytes, fmtSpeed, fmtEta, fmtSizePair, pct, catIcon, el, icon, themedIcon, toast, splitUrls, MEDIA_EXT };
 })();
