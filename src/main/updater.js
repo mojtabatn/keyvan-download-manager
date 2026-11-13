@@ -17,7 +17,7 @@ const { request } = require('./engine/http');
  * build can't replace itself while running, so it just points to the release page.
  */
 class Updater extends EventEmitter {
-  constructor({ version, repo, cacheDir, portable = false, assetPattern = null, apiBase = 'https://api.github.com', allowedPrefixes }) {
+  constructor({ version, repo, cacheDir, portable = false, assetPattern = null, apiBase = 'https://api.github.com', webBase = 'https://github.com', allowedPrefixes }) {
     super();
     this.version = version;
     this.repo = repo;
@@ -25,8 +25,9 @@ class Updater extends EventEmitter {
     this.portable = portable;
     this.assetPattern = assetPattern;
     this.apiBase = apiBase.replace(/\/$/, '');
+    this.webBase = webBase.replace(/\/$/, '');
     // installers are only ever fetched from this project's own release files
-    this.allowed = allowedPrefixes || [`https://github.com/${repo}/releases/download/`];
+    this.allowed = allowedPrefixes || [`${this.webBase}/${repo}/releases/download/`];
     this.state = { status: 'idle', current: version, portable };
     this.timer = null;
   }
@@ -58,7 +59,17 @@ class Updater extends EventEmitter {
     if (this.state.status === 'ready') return this.state;
     this.set({ status: 'checking', error: null });
     try {
-      const rel = await getJson(`${this.apiBase}/repos/${this.repo}/releases/latest`, this.version);
+      let rel;
+      try {
+        rel = await getJson(`${this.apiBase}/repos/${this.repo}/releases/latest`, this.version);
+      } catch (e) {
+        // The GitHub API limits anonymous requests per IP address (60 an hour), and shared networks, VPNs and
+        // proxies hit that limit quickly (HTTP 403 / 429). The release pages on github.com have no such limit.
+        if (!e || !['rate-limited', 'api-error'].includes(e.kind)) throw e;
+        rel = await this.latestFromWeb().catch(() => {
+          throw e;
+        });
+      }
       const latest = String(rel.tag_name || '').replace(/^v/i, '');
       if (!latest || rel.draft || rel.prerelease || compareVersions(latest, this.version) <= 0) {
         this.set({ status: 'none', checkedAt: Date.now() });
@@ -77,6 +88,36 @@ class Updater extends EventEmitter {
       this.set({ status: 'error', error: friendly(e), stage: 'check' });
     }
     return this.state;
+  }
+
+  /**
+   * The same answer as the API's "latest release", read from the public release pages: /releases/latest
+   * redirects to /releases/tag/<tag>, and the installer's file name follows from the tag.
+   * Without the API there is no checksum to compare, so the size comes from the download's own headers.
+   */
+  async latestFromWeb() {
+    const base = `${this.webBase}/${this.repo}/releases`;
+    const headers = { 'User-Agent': `KDM/${this.version}` };
+    const { req, res, url } = await request(`${base}/latest`, { timeout: 20000, headers });
+    res.resume();
+    req.destroy();
+    const m = /\/releases\/tag\/([^/?#]+)$/.exec(String(url || ''));
+    if (res.statusCode === 404) return { tag_name: '' }; // no releases yet
+    if (res.statusCode !== 200 || !m) throw new Error(`GitHub responded ${res.statusCode}`);
+    const tag = decodeURIComponent(m[1]);
+    const v = tag.replace(/^v/i, '');
+    const rel = { tag_name: tag, html_url: `${base}/tag/${encodeURIComponent(tag)}`, assets: [] };
+    if (compareVersions(v, this.version) <= 0) return rel;
+    const names = this.assetPattern ? [] : [this.portable ? `KDM-Portable-${v}.exe` : `KDM-Setup-${v}.exe`];
+    for (const name of names) {
+      const r = await request(`${base}/download/${encodeURIComponent(tag)}/${name}`, { timeout: 20000, headers });
+      r.res.resume();
+      r.req.destroy();
+      // not there (yet): the release exists but its files are still being built
+      if (r.res.statusCode === 200) rel.assets.push({ name, browser_download_url: `${base}/download/${encodeURIComponent(tag)}/${name}`, size: Number(r.res.headers['content-length']) || 0 });
+    }
+    if (!this.assetPattern && !rel.assets.length) return { tag_name: '' }; // wait until the installer is published
+    return rel;
   }
 
   /** Downloads the installer into the cache folder and verifies it. */
@@ -161,7 +202,9 @@ function getJson(url, version) {
         if (res.statusCode !== 200) {
           res.resume();
           req.destroy();
-          return reject(new Error(t('GitHub responded {code}', { code: D(res.statusCode) })));
+          const err = new Error(t('GitHub responded {code}', { code: D(res.statusCode) }));
+          err.kind = res.statusCode === 403 || res.statusCode === 429 ? 'rate-limited' : res.statusCode >= 500 ? 'api-error' : 'http';
+          return reject(err);
         }
         let body = '';
         res.setEncoding('utf8');
