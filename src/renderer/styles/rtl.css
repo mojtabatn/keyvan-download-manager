@@ -10,12 +10,12 @@
 
 /* ---- main window frame */
 :root[dir='rtl'] .sidebar { left: auto; right: 8px; }
-:root[dir='rtl'] .content { left: 8px; right: 188px; }
+:root[dir='rtl'] .content { left: 8px; right: 164px; }
 :root[dir='rtl'] .nav-item { padding-left: 0; padding-right: 15px; text-align: right; }
 :root[dir='rtl'] .badge { margin-left: 12px; margin-right: auto; }
 :root[dir='rtl'] .side-foot { padding: 0 8px 4px 0; }
 :root[dir='rtl'] .total-speed { margin: 0 8px 8px 0; }
-:root[dir='rtl'] .update-btn { margin: 0 -8px 12px 0; text-align: right; }
+:root[dir='rtl'] .update-btn { margin: 0 -5px 12px 0; text-align: right; }
 :root[dir='rtl'] .update-btn .u-fill { left: auto; right: 0; }
 
 /* ---- toolbar */
