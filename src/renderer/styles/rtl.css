@@ -35,12 +35,12 @@
 :root[dir='rtl'] .row .bar .fill, :root[dir='rtl'] .bar .fill { inset: 0 0 0 auto; }
 :root[dir='rtl'] .bar.indeterminate .fill { animation-name: indet-rtl; }
 
-/* compact list: name, size, status, last try from the right */
+/* compact list: name, size, status, last try from the right (Persian digits are wider: 140px for the date) */
 :root[dir='rtl'] .list.compact .row .cat { left: auto; right: 10px; }
-:root[dir='rtl'] .list.compact .row .name { left: 318px; right: 38px; }
-:root[dir='rtl'] .list.compact .row .c-size { right: auto; left: 232px; text-align: left; }
-:root[dir='rtl'] .list.compact .row .c-stat { right: auto; left: 126px; text-align: left; }
-:root[dir='rtl'] .list.compact .row .c-try { right: auto; left: 10px; text-align: left; }
+:root[dir='rtl'] .list.compact .row .name { left: 388px; right: 38px; }
+:root[dir='rtl'] .list.compact .row .c-size { right: auto; left: 282px; text-align: left; }
+:root[dir='rtl'] .list.compact .row .c-stat { right: auto; left: 146px; width: 130px; text-align: left; }
+:root[dir='rtl'] .list.compact .row .c-try { right: auto; left: 10px; width: 130px; text-align: left; font-variant-numeric: normal; }
 
 /* ---- queue panel */
 :root[dir='rtl'] .qp-tools { margin-left: 0; margin-right: auto; }

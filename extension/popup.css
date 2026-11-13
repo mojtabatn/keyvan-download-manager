@@ -1,8 +1,8 @@
-@font-face { font-family: 'IRANYekanX'; font-weight: 100 1000; src: url('fonts/iranyekanx-wght.woff2') format('woff2-variations'); unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+200C-200F, U+FB50-FDFF, U+FE70-FEFC; }
+@font-face { font-family: 'Estedad'; font-weight: 100 900; src: url('fonts/estedad-wght.woff2') format('woff2-variations'); unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+200C-200F, U+FB50-FDFF, U+FE70-FEFC; }
 @font-face { font-family: 'Manrope'; font-weight: 200 800; src: url('fonts/manrope-latin-wght-normal.woff2') format('woff2-variations'); }
 :root { color-scheme: light dark; --bg: #fff; --text: #191919; --muted: #5f5f5f; --line: #ebebeb; --track: #e1e1e1; --field: #fdfdfd; --stroke: #e1e1e1; }
 @media (prefers-color-scheme: dark) { :root { --bg: #211f26; --text: #fff; --muted: #b5b5b5; --line: #434343; --track: #5f5f5f; --field: #2a282f; --stroke: #423e4b; } }
-body { width: 290px; margin: 0; padding: 14px 16px 12px; background: var(--bg); color: var(--text); font: 13px/1.4 'Manrope', 'IRANYekanX', 'Segoe UI', system-ui, sans-serif; }
+body { width: 290px; margin: 0; padding: 14px 16px 12px; background: var(--bg); color: var(--text); font: 13px/1.4 'Manrope', 'Estedad', 'Segoe UI', system-ui, sans-serif; }
 header { display: flex; gap: 10px; align-items: center; padding-bottom: 12px; border-bottom: 1px solid var(--line); margin-bottom: 6px; }
 header img { width: 32px; height: 32px; border-radius: 7px; box-shadow: 0 1px 4px rgba(0,0,0,.12); }
 .title { font-weight: 600; font-size: 14px; }

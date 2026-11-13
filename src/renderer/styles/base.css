@@ -19,13 +19,13 @@
   unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 
-/* IRANYekanX (variable) — Persian letters and digits; Manrope has none, so the browser falls back to it. */
+/* Estedad (variable, OFL) — Persian letters and digits; Manrope has none, so the browser falls back to it. */
 @font-face {
-  font-family: 'IRANYekanX';
+  font-family: 'Estedad';
   font-style: normal;
-  font-weight: 100 1000;
+  font-weight: 100 900;
   font-display: block;
-  src: url('../fonts/iranyekanx-wght.woff2') format('woff2-variations');
+  src: url('../fonts/estedad-wght.woff2') format('woff2-variations');
   unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+200C-200F, U+FB50-FDFF, U+FE70-FEFC;
 }
 
@@ -74,7 +74,7 @@
   --nav-on-a: #0466c8;
   --nav-on-b: #158aff;
   --scroll: rgba(0, 0, 0, 0.16);
-  --font: 'Manrope', 'IRANYekanX', 'Segoe UI Variable Text', 'Segoe UI', Tahoma, system-ui, sans-serif;
+  --font: 'Manrope', 'Estedad', 'Segoe UI Variable Text', 'Segoe UI', Tahoma, system-ui, sans-serif;
   --font-ui: var(--font);
 }
 

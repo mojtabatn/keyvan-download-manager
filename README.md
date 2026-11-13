@@ -190,7 +190,7 @@ Project layout:
 | `extension/` | Manifest V3 browser extension |
 | `scripts/` | End-to-end checks that drive the real app and browser; `readme-shots.js` makes these screenshots |
 
-The UI uses the **Manrope** font (bundled, SIL Open Font License), so it looks the same on every PC.
+The UI uses the **Manrope** font, and **Estedad** for Persian (both bundled, SIL Open Font License), so it looks the same on every PC.
 
 ## Publishing a new version
 
