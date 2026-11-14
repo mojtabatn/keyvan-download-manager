@@ -10,6 +10,19 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   const ENTRIES = [
     {
+      version: '0.2.2',
+      date: '2026-11-14',
+      items: [
+        {
+          icon: 'tool',
+          title: { en: 'Update button fixed' },
+          text: {
+            en: 'The Update Available button works again: it installs the new version itself instead of doing nothing. If an update is found while its files are still being uploaded, KDM waits for them.',
+          },
+        },
+      ],
+    },
+    {
       version: '0.2.1',
       date: '2026-11-14',
       items: [
