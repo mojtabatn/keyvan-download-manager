@@ -363,8 +363,12 @@ function wireManagerEvents() {
   manager.on('completed', (s) => {
     const s0 = settings.get();
     const progressOpen = windows.progress.has(s.id);
-    if (progressOpen && !s0.showCompleteWindow) windows.closeProgress(s.id);
-    if (s0.notifications && Notification.isSupported() && !(progressOpen && s0.showCompleteWindow)) {
+    // The progress window never turns into the finished window: it closes, and a separate "Download complete"
+    // window opens on top of everything. Files the queue downloads in the background only get a notification.
+    if (progressOpen) windows.closeProgress(s.id);
+    const showWindow = s0.showCompleteWindow && (progressOpen || !s.queued);
+    if (showWindow) windows.openComplete(s.id);
+    else if (s0.notifications && Notification.isSupported()) {
       const n = new Notification({ title: t('Download complete'), body: s.filename, icon: path.join(ASSETS, 'app-256.png') });
       n.on('click', () => shell.showItemInFolder(s.savePath));
       n.show();
