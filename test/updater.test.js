@@ -215,3 +215,23 @@ test('a release whose installers are still being uploaded is not offered yet', a
   srv.close();
   srv.closeAllConnections();
 });
+
+test('the release location matches whatever letter case GitHub uses for the repository', async () => {
+  const { srv, base } = await server(rel('0.2.0'));
+  const u = make(base, { allowedPrefixes: [base.toUpperCase()] }); // GitHub: .../Keyvan-Download-Manager/..., we were told .../keyvan-download-manager/...
+  await u.check();
+  assert.strictEqual((await u.download()).status, 'ready');
+  srv.close();
+  srv.closeAllConnections();
+});
+
+test('a refused download location is shown as an error, not silently ignored', async () => {
+  const { srv, base } = await server(rel('0.2.0'));
+  const u = make(base, { allowedPrefixes: ['https://github.com/me/kdm/releases/download/'] });
+  await u.check();
+  await u.download().catch(() => {});
+  assert.strictEqual(u.state.status, 'error');
+  assert.strictEqual(u.state.stage, 'download');
+  srv.close();
+  srv.closeAllConnections();
+});

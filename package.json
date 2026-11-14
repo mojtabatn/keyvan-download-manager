@@ -6,13 +6,13 @@
   "main": "src/main/main.js",
   "author": "Mojtaba",
   "license": "MIT",
-  "homepage": "https://github.com/mojtabatn/keyvan-download-manager",
+  "homepage": "https://github.com/mojtabatn/Keyvan-Download-Manager",
   "repository": {
     "type": "git",
-    "url": "https://github.com/mojtabatn/keyvan-download-manager.git"
+    "url": "https://github.com/mojtabatn/Keyvan-Download-Manager.git"
   },
   "bugs": {
-    "url": "https://github.com/mojtabatn/keyvan-download-manager/issues"
+    "url": "https://github.com/mojtabatn/Keyvan-Download-Manager/issues"
   },
   "private": true,
   "scripts": {

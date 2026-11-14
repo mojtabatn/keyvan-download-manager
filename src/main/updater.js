@@ -137,7 +137,12 @@ class Updater extends EventEmitter {
     if (this.state.status === 'ready') return this.state;
     if (this.downloading) return this.downloading;
     if (!asset || this.portable) throw new Error(t('Nothing to download'));
-    if (!this.allowed.some((p) => String(asset.url).startsWith(p))) throw new Error(t('Unexpected download location'));
+    // GitHub spells the repository the way it was created (Keyvan-Download-Manager), whatever case we were told
+    if (!this.allowed.some((p) => String(asset.url).toLowerCase().startsWith(p.toLowerCase()))) {
+      const e = new Error(t('Unexpected download location'));
+      this.set({ status: 'error', error: e.message, stage: 'download' }); // show it on the button instead of doing nothing
+      throw e;
+    }
     this.downloading = (async () => {
       this.set({ status: 'downloading', progress: { received: 0, total: asset.size || 0 }, error: null });
       const dest = path.join(this.cacheDir, asset.name);
