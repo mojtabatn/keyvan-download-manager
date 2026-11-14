@@ -30,6 +30,7 @@ class Updater extends EventEmitter {
     this.allowed = allowedPrefixes || [`${this.webBase}/${repo}/releases/download/`];
     this.state = { status: 'idle', current: version, portable };
     this.timer = null;
+    this.retryAfter = 5 * 60 * 1000;
   }
 
   set(patch) {
@@ -50,6 +51,7 @@ class Updater extends EventEmitter {
 
   stop() {
     clearTimeout(this.first);
+    clearTimeout(this.retry);
     clearInterval(this.timer);
     this.timer = null;
   }
@@ -73,6 +75,15 @@ class Updater extends EventEmitter {
       const latest = String(rel.tag_name || '').replace(/^v/i, '');
       if (!latest || rel.draft || rel.prerelease || compareVersions(latest, this.version) <= 0) {
         this.set({ status: 'none', checkedAt: Date.now() });
+        return this.state;
+      }
+      // A release is created first and its installers are attached by the build a few minutes later. Offering the
+      // update now would only open the web page: wait for the files and look again soon.
+      if (!(rel.assets || []).length && !this.assetPattern) {
+        this.set({ status: 'none', checkedAt: Date.now(), waitingForFiles: latest });
+        clearTimeout(this.retry);
+        this.retry = setTimeout(() => this.check().catch(() => {}), this.retryAfter);
+        if (this.retry.unref) this.retry.unref();
         return this.state;
       }
       const want = this.assetPattern || (this.portable ? /^KDM-Portable-.*\.exe$/i : /^KDM-Setup-.*\.exe$/i);

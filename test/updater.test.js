@@ -201,3 +201,17 @@ test('rate limit and the release pages unreachable: the error says so', async ()
   srv.close();
   srv.closeAllConnections();
 });
+
+test('a release whose installers are still being uploaded is not offered yet', async () => {
+  let ready = false;
+  const { srv, base } = await server((b) => ({ ...rel('0.2.0')(b), assets: ready ? rel('0.2.0')(b).assets : [] }));
+  const u = make(base);
+  assert.strictEqual((await u.check()).status, 'none');
+  ready = true;
+  const st = await u.check();
+  assert.strictEqual(st.status, 'available');
+  assert.ok(st.asset, 'the installer is there now, so the app can install it itself');
+  u.stop();
+  srv.close();
+  srv.closeAllConnections();
+});
